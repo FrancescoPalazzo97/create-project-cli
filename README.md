@@ -37,6 +37,11 @@ create-project create
 Il CLI ti guiderà attraverso una serie di domande:
 - Nome del progetto
 - Framework da utilizzare (React, Astro, Next.js, Express)
+- Funzionalità aggiuntive specifiche per framework:
+  - **React**: Tailwind CSS, React Router, Zustand
+  - **Next.js**: Tailwind CSS, Zustand
+  - **Astro**: Tailwind CSS
+  - **Express**: Nessuna opzione aggiuntiva al momento
 - Package manager (npm, yarn, pnpm)
 - Inizializzare repository Git
 - Installare le dipendenze automaticamente
@@ -83,6 +88,11 @@ Setup completo con:
 - Struttura cartelle organizzata (`components/`, `hooks/`, `utils/`, `types/`)
 - CSS di base con stili moderni
 
+**Opzioni aggiuntive:**
+- **Tailwind CSS**: Configurazione completa con PostCSS e file di configurazione
+- **React Router**: Routing client-side con setup di esempio
+- **Zustand**: State management leggero e moderno
+
 **Comandi disponibili:**
 ```bash
 npm run dev      # Server di sviluppo
@@ -100,6 +110,9 @@ Setup completo con:
 - Path aliases configurati (`@components/*`, `@layouts/*`, `@styles/*`)
 - Stili globali e CSS-scoped
 
+**Opzioni aggiuntive:**
+- **Tailwind CSS**: Integrazione Astro con configurazione ottimizzata
+
 **Comandi disponibili:**
 ```bash
 npm run dev      # Server di sviluppo
@@ -116,6 +129,10 @@ Setup completo con:
 - CSS Modules + stili globali
 - Dark mode ready
 - Path aliases configurati (`@/*`)
+
+**Opzioni aggiuntive:**
+- **Tailwind CSS**: Configurazione Next.js ottimizzata con supporto App Router
+- **Zustand**: State management con supporto Server Components
 
 **Comandi disponibili:**
 ```bash
