@@ -41,7 +41,7 @@ Il CLI ti guiderà attraverso una serie di domande:
   - **React**: Tailwind CSS, React Router, Zustand
   - **Next.js**: Tailwind CSS, Zustand
   - **Astro**: Tailwind CSS
-  - **Express**: Nessuna opzione aggiuntiva al momento
+  - **Express**: Database (MongoDB, PostgreSQL), Docker Compose
 - Package manager (npm, yarn, pnpm)
 - Inizializzare repository Git
 - Installare le dipendenze automaticamente
@@ -152,6 +152,17 @@ Setup completo con:
 - CORS e Helmet per sicurezza
 - Hot reload con tsx watch
 
+**Opzioni aggiuntive:**
+- **MongoDB**: Integrazione con Mongoose per database NoSQL
+  - Schema e model di esempio
+  - Connessione configurata e gestione errori
+- **PostgreSQL**: Integrazione con Prisma ORM
+  - Schema Prisma di esempio
+  - Comandi per migrazione e gestione database
+- **Docker Compose**: Setup locale del database
+  - Configurazione pronta per MongoDB o PostgreSQL
+  - Variabili d'ambiente pre-configurate
+
 **Struttura progetto:**
 ```
 src/
@@ -160,10 +171,13 @@ src/
 ├── middlewares/   # Middleware Express
 ├── routes/        # Definizione delle route
 ├── services/      # Logica di business
+├── models/        # Model Mongoose (se MongoDB selezionato)
 ├── types/         # Tipi TypeScript
 ├── utils/         # Funzioni di utilità
 ├── app.ts         # Configurazione Express
 └── server.ts      # Entry point
+prisma/            # Schema Prisma (se PostgreSQL selezionato)
+└── schema.prisma
 ```
 
 **Comandi disponibili:**
@@ -172,6 +186,12 @@ npm run dev      # Sviluppo con hot reload
 npm run build    # Build TypeScript
 npm start        # Avvia versione compilata
 npm run lint     # Lint del codice
+
+# Solo per PostgreSQL:
+npm run db:generate  # Genera Prisma Client
+npm run db:push      # Push schema al database
+npm run db:migrate   # Esegui migrazioni
+npm run db:studio    # Apri Prisma Studio
 ```
 
 ## Validazione Nome Progetto
@@ -198,12 +218,13 @@ Il CLI valida il nome del progetto secondo le convenzioni npm:
 
 3. **Generazione Progetto** ([src/generators/](src/generators/))
    - Router che seleziona il generator appropriato
-   - Ogni generator segue pattern a 5 fasi:
+   - Ogni generator segue pattern a 5-6 fasi:
      1. Creazione struttura cartelle
      2. Generazione package.json
      3. Generazione file di configurazione
      4. Generazione file sorgente
      5. Generazione README
+     6. File aggiuntivi (es. Docker Compose per Express)
 
 4. **Post-Processing**
    - Installazione dipendenze (opzionale)
