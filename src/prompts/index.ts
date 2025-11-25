@@ -7,7 +7,9 @@ import type {
     CliOptions,
     ReactOptions,
     NextOptions,
-    AstroOptions
+    AstroOptions,
+    ExpressOptions,
+    Database
 } from '../types/index.js';
 
 // Validazione del nome progetto
@@ -73,6 +75,29 @@ async function promptAstroOptions(): Promise<AstroOptions> {
     return { tailwind };
 }
 
+// Prompt per opzioni Express
+async function promptExpressOptions(): Promise<ExpressOptions> {
+    const database = await select<Database>({
+        message: 'Quale database vuoi utilizzare?',
+        choices: [
+            { value: 'none', name: 'Nessuno (aggiungerò dopo)' },
+            { value: 'mongodb', name: 'MongoDB (con Mongoose)' },
+            { value: 'postgresql', name: 'PostgreSQL (con Prisma)' }
+        ]
+    });
+
+    let docker = false;
+
+    if (database !== 'none') {
+        docker = await confirm({
+            message: 'Vuoi aggiungere Docker Compose per il database?',
+            default: true
+        });
+    }
+
+    return { database, docker };
+}
+
 export async function promptProjectConfig(
     nomeProgetto: string | undefined,
     options: CliOptions
@@ -110,6 +135,7 @@ export async function promptProjectConfig(
     let reactOptions: ReactOptions | undefined;
     let nextOptions: NextOptions | undefined;
     let astroOptions: AstroOptions | undefined;
+    let expressOptions: ExpressOptions | undefined;
 
     if (framework === 'react') {
         reactOptions = await promptReactOptions();
@@ -117,6 +143,8 @@ export async function promptProjectConfig(
         nextOptions = await promptNextOptions();
     } else if (framework === 'astro') {
         astroOptions = await promptAstroOptions();
+    } else if (framework === 'express') {
+        expressOptions = await promptExpressOptions();
     }
 
     const packageManager = await select<PackageManager>({
@@ -147,6 +175,7 @@ export async function promptProjectConfig(
         installDeps,
         reactOptions,
         nextOptions,
-        astroOptions
+        astroOptions,
+        expressOptions
     };
 }

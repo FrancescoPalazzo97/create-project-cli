@@ -2,6 +2,8 @@ export type Framework = 'react' | 'astro' | 'next' | 'express';
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm';
 
+export type Database = 'mongodb' | 'postgresql' | 'none';
+
 // Opzioni specifiche per React
 export interface ReactOptions {
     tailwind: boolean;
@@ -22,7 +24,8 @@ export interface AstroOptions {
 
 // Opzioni specifiche per Express
 export interface ExpressOptions {
-    // Per ora vuoto, potremo aggiungere database, auth, etc.
+    database: Database;
+    docker: boolean;
 }
 
 export interface ProjectConfig {
@@ -32,14 +35,13 @@ export interface ProjectConfig {
     packageManager: PackageManager;
     initGit: boolean;
     installDeps: boolean;
-    // Opzioni specifiche per framework
     reactOptions?: ReactOptions;
     nextOptions?: NextOptions;
     astroOptions?: AstroOptions;
     expressOptions?: ExpressOptions;
 }
 
-// Opzioni che arrivano da Commander (possono essere undefined)
+// Opzioni che arrivano da Commander
 export interface CliOptions {
     framework?: Framework;
     directory?: string;
