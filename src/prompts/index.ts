@@ -1,6 +1,14 @@
-import { input, select, confirm } from '@inquirer/prompts';
+import { input, select, confirm, checkbox } from '@inquirer/prompts';
 import { logger } from '../utils/logger.js';
-import type { Framework, PackageManager, ProjectConfig, CliOptions } from '../types/index.js';
+import type {
+    Framework,
+    PackageManager,
+    ProjectConfig,
+    CliOptions,
+    ReactOptions,
+    NextOptions,
+    AstroOptions
+} from '../types/index.js';
 
 // Validazione del nome progetto
 function validateProjectName(name: string): true | string {
@@ -15,6 +23,54 @@ function validateProjectName(name: string): true | string {
     }
 
     return true;
+}
+
+// Prompt per opzioni React
+async function promptReactOptions(): Promise<ReactOptions> {
+    const choices = [
+        { name: 'Tailwind CSS', value: 'tailwind' },
+        { name: 'React Router', value: 'reactRouter' },
+        { name: 'Zustand (State Management)', value: 'zustand' }
+    ];
+
+    const selected = await checkbox({
+        message: 'Quali funzionalità vuoi aggiungere?',
+        choices
+    });
+
+    return {
+        tailwind: selected.includes('tailwind'),
+        reactRouter: selected.includes('reactRouter'),
+        zustand: selected.includes('zustand')
+    };
+}
+
+// Prompt per opzioni Next.js
+async function promptNextOptions(): Promise<NextOptions> {
+    const choices = [
+        { name: 'Tailwind CSS', value: 'tailwind' },
+        { name: 'Zustand (State Management)', value: 'zustand' }
+    ];
+
+    const selected = await checkbox({
+        message: 'Quali funzionalità vuoi aggiungere?',
+        choices
+    });
+
+    return {
+        tailwind: selected.includes('tailwind'),
+        zustand: selected.includes('zustand')
+    };
+}
+
+// Prompt per opzioni Astro
+async function promptAstroOptions(): Promise<AstroOptions> {
+    const tailwind = await confirm({
+        message: 'Vuoi aggiungere Tailwind CSS?',
+        default: false
+    });
+
+    return { tailwind };
 }
 
 export async function promptProjectConfig(
@@ -50,6 +106,19 @@ export async function promptProjectConfig(
 
     const directory = options.directory || `./${name}`;
 
+    // Opzioni specifiche per framework
+    let reactOptions: ReactOptions | undefined;
+    let nextOptions: NextOptions | undefined;
+    let astroOptions: AstroOptions | undefined;
+
+    if (framework === 'react') {
+        reactOptions = await promptReactOptions();
+    } else if (framework === 'next') {
+        nextOptions = await promptNextOptions();
+    } else if (framework === 'astro') {
+        astroOptions = await promptAstroOptions();
+    }
+
     const packageManager = await select<PackageManager>({
         message: 'Quale package manager vuoi utilizzare?',
         choices: [
@@ -75,6 +144,9 @@ export async function promptProjectConfig(
         directory,
         packageManager,
         initGit,
-        installDeps
+        installDeps,
+        reactOptions,
+        nextOptions,
+        astroOptions
     };
 }

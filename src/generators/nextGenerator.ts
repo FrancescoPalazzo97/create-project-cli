@@ -4,50 +4,67 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
-    const projectPath = path.resolve(config.directory);
+  const projectPath = path.resolve(config.directory);
+  const opts = config.nextOptions || { tailwind: false, zustand: false };
 
-    logger.step(1, 5, 'Creazione struttura cartelle...');
+  logger.step(1, 5, 'Creazione struttura cartelle...');
 
-    // Crea le directory (struttura con src/ e App Router)
-    await createDirectory(path.join(projectPath, 'src', 'app'));
-    await createDirectory(path.join(projectPath, 'src', 'components'));
-    await createDirectory(path.join(projectPath, 'src', 'lib'));
-    await createDirectory(path.join(projectPath, 'src', 'types'));
-    await createDirectory(path.join(projectPath, 'public'));
+  await createDirectory(path.join(projectPath, 'src', 'app'));
+  await createDirectory(path.join(projectPath, 'src', 'components'));
+  await createDirectory(path.join(projectPath, 'src', 'lib'));
+  await createDirectory(path.join(projectPath, 'src', 'types'));
+  await createDirectory(path.join(projectPath, 'public'));
 
-    logger.step(2, 5, 'Generazione package.json...');
+  if (opts.zustand) {
+    await createDirectory(path.join(projectPath, 'src', 'store'));
+  }
 
-    const packageJson = {
-        name: config.name,
-        version: '0.1.0',
-        private: true,
-        scripts: {
-            dev: 'next dev',
-            build: 'next build',
-            start: 'next start',
-            lint: 'next lint'
-        },
-        dependencies: {
-            next: '^15.3.2',
-            react: '^19.1.0',
-            'react-dom': '^19.1.0'
-        },
-        devDependencies: {
-            '@types/node': '^22.15.21',
-            '@types/react': '^19.1.2',
-            '@types/react-dom': '^19.1.2',
-            typescript: '^5.8.3',
-            eslint: '^9.27.0',
-            'eslint-config-next': '^15.3.2'
-        }
-    };
+  logger.step(2, 5, 'Generazione package.json...');
 
-    await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+  const dependencies: Record<string, string> = {
+    'next': '^15.3.2',
+    'react': '^19.1.0',
+    'react-dom': '^19.1.0'
+  };
 
-    logger.step(3, 5, 'Generazione file di configurazione...');
+  const devDependencies: Record<string, string> = {
+    '@types/node': '^22.15.21',
+    '@types/react': '^19.1.2',
+    '@types/react-dom': '^19.1.2',
+    'typescript': '^5.8.3',
+    'eslint': '^9.27.0',
+    'eslint-config-next': '^15.3.2'
+  };
 
-    // next.config.ts
-    const nextConfig = `import type { NextConfig } from 'next';
+  if (opts.zustand) {
+    dependencies['zustand'] = '^5.0.4';
+  }
+
+  if (opts.tailwind) {
+    devDependencies['tailwindcss'] = '^4.1.6';
+    devDependencies['@tailwindcss/postcss'] = '^4.1.6';
+  }
+
+  const packageJson = {
+    name: config.name,
+    version: '0.1.0',
+    private: true,
+    scripts: {
+      dev: 'next dev',
+      build: 'next build',
+      start: 'next start',
+      lint: 'next lint'
+    },
+    dependencies,
+    devDependencies
+  };
+
+  await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+
+  logger.step(3, 5, 'Generazione file di configurazione...');
+
+  // next.config.ts
+  const nextConfig = `import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // La tua configurazione Next.js
@@ -56,55 +73,64 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 `;
 
-    await writeFile(path.join(projectPath, 'next.config.ts'), nextConfig);
+  await writeFile(path.join(projectPath, 'next.config.ts'), nextConfig);
 
-    // tsconfig.json
-    const tsconfig = {
-        compilerOptions: {
-            target: 'ES2022',
-            lib: ['dom', 'dom.iterable', 'esnext'],
-            allowJs: true,
-            skipLibCheck: true,
-            strict: true,
-            noEmit: true,
-            esModuleInterop: true,
-            module: 'esnext',
-            moduleResolution: 'bundler',
-            resolveJsonModule: true,
-            isolatedModules: true,
-            jsx: 'preserve',
-            incremental: true,
-            plugins: [{ name: 'next' }],
-            paths: {
-                '@/*': ['./src/*']
-            }
-        },
-        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
-        exclude: ['node_modules']
-    };
+  // tsconfig.json
+  const tsconfig = {
+    compilerOptions: {
+      target: 'ES2022',
+      lib: ['dom', 'dom.iterable', 'esnext'],
+      allowJs: true,
+      skipLibCheck: true,
+      strict: true,
+      noEmit: true,
+      esModuleInterop: true,
+      module: 'esnext',
+      moduleResolution: 'bundler',
+      resolveJsonModule: true,
+      isolatedModules: true,
+      jsx: 'preserve',
+      incremental: true,
+      plugins: [{ name: 'next' }],
+      paths: {
+        '@/*': ['./src/*']
+      }
+    },
+    include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+    exclude: ['node_modules']
+  };
 
-    await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+  await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-    // next-env.d.ts
-    const nextEnv = `/// <reference types="next" />
+  // postcss.config.mjs (per Tailwind)
+  if (opts.tailwind) {
+    const postcssConfig = `const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+`;
+    await writeFile(path.join(projectPath, 'postcss.config.mjs'), postcssConfig);
+  }
+
+  // next-env.d.ts
+  const nextEnv = `/// <reference types="next" />
 /// <reference types="next/image-types/global" />
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
 `;
 
-    await writeFile(path.join(projectPath, 'next-env.d.ts'), nextEnv);
+  await writeFile(path.join(projectPath, 'next-env.d.ts'), nextEnv);
 
-    // .gitignore
-    const gitignore = `# Dependencies
+  // .gitignore
+  const gitignore = `# Dependencies
 node_modules
 /.pnp
 .pnp.*
 .yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # Build
 /.next/
@@ -121,8 +147,6 @@ node_modules
 # Debug
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
 
 # Vercel
 .vercel
@@ -135,12 +159,39 @@ next-env.d.ts
 .DS_Store
 `;
 
-    await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+  await writeFile(path.join(projectPath, '.gitignore'), gitignore);
 
-    logger.step(4, 5, 'Generazione file sorgente...');
+  logger.step(4, 5, 'Generazione file sorgente...');
 
-    // src/app/globals.css
-    const globalsCss = `:root {
+  // Genera store Zustand se richiesto
+  if (opts.zustand) {
+    const storeFile = `import { create } from 'zustand';
+
+interface CounterState {
+  count: number;
+  increment: () => void;
+  decrement: () => void;
+  reset: () => void;
+}
+
+export const useCounterStore = create<CounterState>((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  decrement: () => set((state) => ({ count: state.count - 1 })),
+  reset: () => set({ count: 0 })
+}));
+`;
+    await writeFile(path.join(projectPath, 'src', 'store', 'counterStore.ts'), storeFile);
+  }
+
+  // src/app/globals.css
+  let globalsCss: string;
+
+  if (opts.tailwind) {
+    globalsCss = `@import "tailwindcss";
+`;
+  } else {
+    globalsCss = `:root {
   --color-background: #ffffff;
   --color-foreground: #171717;
   --color-primary: #0070f3;
@@ -182,11 +233,12 @@ a:hover {
   text-decoration: underline;
 }
 `;
+  }
 
-    await writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
+  await writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
 
-    // src/app/layout.tsx
-    const layoutTsx = `import type { Metadata } from 'next';
+  // src/app/layout.tsx
+  const layoutTsx = `import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -207,29 +259,113 @@ export default function RootLayout({
 }
 `;
 
-    await writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layoutTsx);
+  await writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layoutTsx);
 
-    // src/app/page.tsx
-    const pageTsx = `import styles from './page.module.css';
+  // src/app/page.tsx
+  let pageTsx: string;
+
+  if (opts.zustand) {
+    if (opts.tailwind) {
+      pageTsx = `'use client';
+
+import { useCounterStore } from '@/store/counterStore';
+
+export default function Home() {
+  const { count, increment, decrement, reset } = useCounterStore();
+
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">${config.name}</h1>
+        <p className="text-gray-600 mb-8">Il tuo progetto Next.js è pronto!</p>
+        
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <p className="text-2xl font-semibold mb-4">Contatore: {count}</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={decrement}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              -
+            </button>
+            <button
+              onClick={reset}
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Reset
+            </button>
+            <button
+              onClick={increment}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+`;
+    } else {
+      pageTsx = `'use client';
+
+import { useCounterStore } from '@/store/counterStore';
+import styles from './page.module.css';
+
+export default function Home() {
+  const { count, increment, decrement, reset } = useCounterStore();
+
+  return (
+    <main className={styles.main}>
+      <h1 className={styles.title}>${config.name}</h1>
+      <p className={styles.description}>Il tuo progetto Next.js è pronto!</p>
+      
+      <div className={styles.card}>
+        <p className={styles.count}>Contatore: {count}</p>
+        <div className={styles.buttons}>
+          <button onClick={decrement} className={styles.btnDanger}>-</button>
+          <button onClick={reset} className={styles.btnSecondary}>Reset</button>
+          <button onClick={increment} className={styles.btnSuccess}>+</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+`;
+    }
+  } else {
+    if (opts.tailwind) {
+      pageTsx = `export default function Home() {
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">${config.name}</h1>
+        <p className="text-gray-600">Il tuo progetto Next.js è pronto!</p>
+      </div>
+    </main>
+  );
+}
+`;
+    } else {
+      pageTsx = `import styles from './page.module.css';
 
 export default function Home() {
   return (
     <main className={styles.main}>
       <h1 className={styles.title}>${config.name}</h1>
-      <p className={styles.description}>
-        Il tuo progetto Next.js è pronto.
-      </p>
-      <p className={styles.hint}>
-        Modifica <code>src/app/page.tsx</code> per iniziare.
-      </p>
+      <p className={styles.description}>Il tuo progetto Next.js è pronto!</p>
     </main>
   );
 }
 `;
+    }
+  }
 
-    await writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), pageTsx);
+  await writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), pageTsx);
 
-    // src/app/page.module.css
+  // src/app/page.module.css (solo se non usa Tailwind)
+  if (!opts.tailwind) {
     const pageModuleCss = `.main {
   display: flex;
   flex-direction: column;
@@ -248,95 +384,91 @@ export default function Home() {
 .description {
   font-size: 1.25rem;
   color: #666;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.count {
+  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: 1rem;
 }
 
-.hint {
-  color: #888;
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
-.hint code {
-  background-color: #f4f4f4;
-  padding: 0.2rem 0.5rem;
+.buttons button {
+  padding: 0.5rem 1rem;
+  border: none;
   border-radius: 4px;
-  font-size: 0.9rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: white;
 }
 
-@media (prefers-color-scheme: dark) {
-  .description {
-    color: #888;
-  }
+.btnDanger {
+  background-color: #ef4444;
+}
 
-  .hint {
-    color: #666;
-  }
+.btnDanger:hover {
+  background-color: #dc2626;
+}
 
-  .hint code {
-    background-color: #222;
-  }
+.btnSecondary {
+  background-color: #6b7280;
+}
+
+.btnSecondary:hover {
+  background-color: #4b5563;
+}
+
+.btnSuccess {
+  background-color: #22c55e;
+}
+
+.btnSuccess:hover {
+  background-color: #16a34a;
 }
 `;
-
     await writeFile(path.join(projectPath, 'src', 'app', 'page.module.css'), pageModuleCss);
+  }
 
-    // src/components/Button.tsx (componente di esempio)
-    const buttonComponent = `interface ButtonProps {
-  children: React.ReactNode;
-  onClick?: () => void;
-  variant?: 'primary' | 'secondary';
-}
-
-export function Button({ children, onClick, variant = 'primary' }: ButtonProps) {
-  const baseStyles = {
-    padding: '0.75rem 1.5rem',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    border: 'none',
-    transition: 'background-color 0.2s',
-  };
-
-  const variants = {
-    primary: {
-      backgroundColor: '#0070f3',
-      color: 'white',
-    },
-    secondary: {
-      backgroundColor: 'transparent',
-      color: '#0070f3',
-      border: '1px solid #0070f3',
-    },
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      style={{ ...baseStyles, ...variants[variant] }}
-    >
-      {children}
-    </button>
-  );
-}
-`;
-
-    await writeFile(path.join(projectPath, 'src', 'components', 'Button.tsx'), buttonComponent);
-
-    // public/favicon.ico placeholder (file vuoto, Next.js lo gestisce)
-    const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  // public/favicon.svg
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
   <circle cx="18" cy="18" r="16" fill="#0070f3"/>
   <text x="18" y="24" text-anchor="middle" font-size="18" fill="white">N</text>
 </svg>
 `;
 
-    await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
+  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
 
-    logger.step(5, 5, 'Generazione README...');
+  logger.step(5, 5, 'Generazione README...');
 
-    // README.md
-    const readme = `# ${config.name}
+  const features = [
+    'Next.js 15',
+    'React 19',
+    'TypeScript',
+    'App Router',
+    ...(opts.tailwind ? ['Tailwind CSS'] : []),
+    ...(opts.zustand ? ['Zustand'] : [])
+  ];
+
+  const readme = `# ${config.name}
 
 Progetto Next.js + TypeScript creato con Create Project CLI.
+
+## Funzionalità
+
+${features.map(f => `- ${f}`).join('\n')}
 
 ## Struttura del progetto
 
@@ -348,8 +480,7 @@ src/
 │   └── globals.css
 ├── components/    # Componenti React riutilizzabili
 ├── lib/           # Utility e funzioni condivise
-└── types/         # Tipi TypeScript
-public/            # Asset statici
+${opts.zustand ? '├── store/         # Store Zustand\n' : ''}└── types/         # Tipi TypeScript
 \`\`\`
 
 ## Comandi disponibili
@@ -367,13 +498,7 @@ ${config.packageManager} start
 # Lint del codice
 ${config.packageManager} run lint
 \`\`\`
-
-## Risorse utili
-
-- [Documentazione Next.js](https://nextjs.org/docs)
-- [Learn Next.js](https://nextjs.org/learn)
-- [Next.js su GitHub](https://github.com/vercel/next.js)
 `;
 
-    await writeFile(path.join(projectPath, 'README.md'), readme);
+  await writeFile(path.join(projectPath, 'README.md'), readme);
 }
