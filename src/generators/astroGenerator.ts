@@ -1,0 +1,413 @@
+import path from 'node:path';
+import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
+import { logger } from '../utils/logger.js';
+import type { ProjectConfig } from '../types/index.js';
+
+export async function generateAstroProject(config: ProjectConfig): Promise<void> {
+    const projectPath = path.resolve(config.directory);
+
+    logger.step(1, 5, 'Creazione struttura cartelle...');
+
+    // Crea le directory
+    await createDirectory(path.join(projectPath, 'src', 'components'));
+    await createDirectory(path.join(projectPath, 'src', 'layouts'));
+    await createDirectory(path.join(projectPath, 'src', 'pages'));
+    await createDirectory(path.join(projectPath, 'src', 'styles'));
+    await createDirectory(path.join(projectPath, 'public'));
+
+    logger.step(2, 5, 'Generazione package.json...');
+
+    const packageJson = {
+        name: config.name,
+        type: 'module',
+        version: '0.1.0',
+        scripts: {
+            dev: 'astro dev',
+            build: 'astro build',
+            preview: 'astro preview',
+            astro: 'astro'
+        },
+        dependencies: {
+            astro: '^5.7.13'
+        },
+        devDependencies: {
+            '@astrojs/check': '^0.9.4',
+            typescript: '^5.8.3'
+        }
+    };
+
+    await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+
+    logger.step(3, 5, 'Generazione file di configurazione...');
+
+    // astro.config.mjs
+    const astroConfig = `import { defineConfig } from 'astro/config';
+
+export default defineConfig({
+  // La tua configurazione Astro
+  // Docs: https://docs.astro.build/en/reference/configuration-reference/
+});
+`;
+
+    await writeFile(path.join(projectPath, 'astro.config.mjs'), astroConfig);
+
+    // tsconfig.json
+    const tsconfig = {
+        extends: 'astro/tsconfigs/strict',
+        compilerOptions: {
+            baseUrl: '.',
+            paths: {
+                '@components/*': ['src/components/*'],
+                '@layouts/*': ['src/layouts/*'],
+                '@styles/*': ['src/styles/*']
+            }
+        }
+    };
+
+    await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+
+    // .gitignore
+    const gitignore = `# Build
+dist/
+.astro/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+`;
+
+    await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+
+    logger.step(4, 5, 'Generazione file sorgente...');
+
+    // src/styles/global.css
+    const globalCss = `:root {
+  --color-text: #333;
+  --color-background: #fff;
+  --color-primary: #4f46e5;
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background-color: var(--color-background);
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'styles', 'global.css'), globalCss);
+
+    // src/layouts/BaseLayout.astro
+    const baseLayout = `---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = '${config.name} - Sito creato con Astro' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'layouts', 'BaseLayout.astro'), baseLayout);
+
+    // src/components/Header.astro
+    const headerComponent = `---
+interface Props {
+  siteName?: string;
+}
+
+const { siteName = '${config.name}' } = Astro.props;
+---
+
+<header>
+  <nav>
+    <a href="/" class="logo">{siteName}</a>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+</header>
+
+<style>
+  header {
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  nav {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--color-primary);
+  }
+
+  ul {
+    display: flex;
+    gap: 1.5rem;
+    list-style: none;
+  }
+
+  a {
+    color: var(--color-text);
+    transition: color 0.2s;
+  }
+
+  a:hover {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+</style>
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'components', 'Header.astro'), headerComponent);
+
+    // src/components/Footer.astro
+    const footerComponent = `---
+const year = new Date().getFullYear();
+---
+
+<footer>
+  <p>&copy; {year} ${config.name}. Creato con Astro.</p>
+</footer>
+
+<style>
+  footer {
+    padding: 2rem;
+    text-align: center;
+    border-top: 1px solid #eee;
+    margin-top: auto;
+  }
+
+  p {
+    color: #666;
+    font-size: 0.875rem;
+  }
+</style>
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'components', 'Footer.astro'), footerComponent);
+
+    // src/pages/index.astro
+    const indexPage = `---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<BaseLayout title="${config.name}">
+  <Header />
+  
+  <main>
+    <section class="hero">
+      <h1>Benvenuto in ${config.name}</h1>
+      <p>Il tuo nuovo progetto Astro è pronto.</p>
+      <a href="/about" class="button">Scopri di più</a>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  main {
+    flex: 1;
+  }
+
+  .hero {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    font-size: 1.25rem;
+    color: #666;
+    margin-bottom: 2rem;
+  }
+
+  .button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .button:hover {
+    background-color: #4338ca;
+    text-decoration: none;
+  }
+</style>
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'pages', 'index.astro'), indexPage);
+
+    // src/pages/about.astro
+    const aboutPage = `---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<BaseLayout title="About - ${config.name}">
+  <Header />
+  
+  <main>
+    <article>
+      <h1>About</h1>
+      <p>
+        Questo è un progetto creato con <strong>Astro</strong> e 
+        <strong>TypeScript</strong> usando Create Project CLI.
+      </p>
+      <p>
+        Astro è un framework moderno per costruire siti web veloci 
+        e content-focused con meno JavaScript.
+      </p>
+      <a href="/">&larr; Torna alla home</a>
+    </article>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  article {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  p {
+    line-height: 1.7;
+    margin-bottom: 1rem;
+    color: #444;
+  }
+
+  a {
+    display: inline-block;
+    margin-top: 1.5rem;
+  }
+</style>
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'pages', 'about.astro'), aboutPage);
+
+    // public/favicon.svg
+    const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <circle cx="18" cy="18" r="16" fill="#4f46e5"/>
+  <text x="18" y="24" text-anchor="middle" font-size="20" fill="white">A</text>
+</svg>
+`;
+
+    await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
+
+    logger.step(5, 5, 'Generazione README...');
+
+    // README.md
+    const readme = `# ${config.name}
+
+Sito Astro + TypeScript creato con Create Project CLI.
+
+## Struttura del progetto
+
+\`\`\`
+src/
+├── components/    # Componenti riutilizzabili (.astro)
+├── layouts/       # Layout delle pagine
+├── pages/         # Route del sito (file-based routing)
+└── styles/        # Stili globali
+public/            # Asset statici
+\`\`\`
+
+## Comandi disponibili
+
+\`\`\`bash
+# Avvia il server di sviluppo
+${config.packageManager} run dev
+
+# Build per produzione
+${config.packageManager} run build
+
+# Preview della build
+${config.packageManager} run preview
+\`\`\`
+
+## Risorse utili
+
+- [Documentazione Astro](https://docs.astro.build)
+- [Astro Components](https://docs.astro.build/en/core-concepts/astro-components/)
+- [Astro Integrations](https://astro.build/integrations/)
+`;
+
+    await writeFile(path.join(projectPath, 'README.md'), readme);
+}
