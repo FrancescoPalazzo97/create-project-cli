@@ -6,7 +6,8 @@ import {
     directoryExists,
     isDirectoryEmpty,
     initGit,
-    installDependencies
+    installDependencies,
+    ASCII_BANNER
 } from './utils/index.js';
 import type { CliOptions } from './types/index.js';
 
@@ -27,7 +28,8 @@ program
     .option('--no-install', 'Non installare le dipendenze automaticamente')
     .action(async (nomeProgetto: string | undefined, options: CliOptions) => {
         try {
-            logger.title('🚀 Create Project CLI');
+            // Banner iniziale
+            logger.banner(ASCII_BANNER);
 
             const config = await promptProjectConfig(nomeProgetto, options);
 
@@ -40,7 +42,9 @@ program
             }
 
             logger.newLine();
+            logger.divider();
             logger.info(`Creazione progetto ${config.framework.toUpperCase()}...`);
+            logger.divider();
             logger.newLine();
 
             // 1. Genera il progetto
@@ -59,19 +63,16 @@ program
             }
 
             // Messaggio finale
-            logger.newLine();
-            logger.success('Progetto creato con successo!');
-            logger.newLine();
+            logger.celebrate('✨ Progetto creato con successo! ✨');
 
-            // Istruzioni finali
-            logger.log('Prossimi passi:');
-            logger.newLine();
-            logger.log(`  cd ${config.directory}`);
-            if (!config.installDeps) {
-                logger.log(`  ${config.packageManager} install`);
-            }
-            logger.log(`  ${config.packageManager} run dev`);
-            logger.newLine();
+            // Box con istruzioni
+            const instructions = [
+                `cd ${config.directory}`,
+                ...(config.installDeps ? [] : [`${config.packageManager} install`]),
+                `${config.packageManager} run dev`
+            ].join('\n');
+
+            logger.box(instructions, '🎯 Prossimi passi');
 
         } catch (error) {
             if (error instanceof Error && error.name === 'ExitPromptError') {
