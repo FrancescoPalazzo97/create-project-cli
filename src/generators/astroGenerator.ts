@@ -3,6 +3,7 @@ import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.j
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig, AstroOptions } from '../types/index.js';
 import { generateAstroWorkflow } from './githubActionsGenerator.js';
+import { gitignorePresets } from '../templates/gitignore.js';
 
 export async function generateAstroProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -144,28 +145,7 @@ export default {
   await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
   // .gitignore
-  const gitignore = `# Build
-dist/
-.astro/
-
-# Dependencies
-node_modules/
-
-# Environment
-.env
-.env.local
-.env.production
-
-# OS
-.DS_Store
-
-# Editor
-.vscode/*
-!.vscode/extensions.json
-.idea
-`;
-
-  await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.astro());
 }
 
 // ============================================

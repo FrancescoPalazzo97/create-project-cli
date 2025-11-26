@@ -3,6 +3,7 @@ import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.j
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig, NextOptions } from '../types/index.js';
 import { generateNextWorkflow } from './githubActionsGenerator.js';
+import { gitignorePresets } from '../templates/gitignore.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -173,40 +174,7 @@ export default config;
   await writeFile(path.join(projectPath, 'next-env.d.ts'), nextEnv);
 
   // .gitignore
-  const gitignore = `# Dependencies
-node_modules
-/.pnp
-.pnp.*
-.yarn/*
-
-# Build
-/.next/
-/out/
-/build
-
-# Environment
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# OS
-.DS_Store
-`;
-
-  await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.next());
 }
 
 // ============================================

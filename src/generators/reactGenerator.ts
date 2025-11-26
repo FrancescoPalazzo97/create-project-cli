@@ -3,6 +3,7 @@ import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.j
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
 import { generateReactWorkflow } from './githubActionsGenerator.js';
+import { gitignorePresets } from '../templates/gitignore.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -175,32 +176,7 @@ export default defineConfig({
   await writeFile(path.join(projectPath, 'vite.config.ts'), viteConfig);
 
   // .gitignore
-  const gitignore = `# Dependencies
-node_modules
-
-# Build
-dist
-dist-ssr
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Editor
-.vscode/*
-!.vscode/extensions.json
-.idea
-
-# Logs
-*.log
-npm-debug.log*
-
-# OS
-.DS_Store
-`;
-
-  await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.react());
 
   // vite-env.d.ts
   const viteEnv = `/// <reference types="vite/client" />

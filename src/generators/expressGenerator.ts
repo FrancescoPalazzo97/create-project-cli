@@ -3,6 +3,7 @@ import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.j
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig, ExpressOptions } from '../types/index.js';
 import { generateExpressWorkflow } from './githubActionsGenerator.js';
+import { gitignorePresets } from '../templates/gitignore.js';
 
 export async function generateExpressProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -192,30 +193,7 @@ JWT_EXPIRES_IN=7d
   await writeFile(path.join(projectPath, '.env'), envContent);
 
   // .gitignore
-  const gitignore = `# Dependencies
-node_modules
-
-# Build
-dist
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-npm-debug.log*
-
-# OS
-.DS_Store
-
-# Editor
-.vscode/*
-.idea
-`;
-
-  await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.express());
 
   // Docker Compose
   if (opts.docker) {
