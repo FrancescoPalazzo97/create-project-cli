@@ -1,11 +1,15 @@
 import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
-import type { ProjectConfig } from '../types/index.js';
+import type { ProjectConfig, ExpressOptions } from '../types/index.js';
 
 export async function generateExpressProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.expressOptions || { database: 'none', docker: false };
+  const opts: ExpressOptions = config.expressOptions || {
+    database: 'none',
+    authentication: false,
+    docker: false
+  };
 
   logger.step(1, 6, 'Creazione struttura cartelle...');
 
@@ -28,6 +32,34 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
 
   logger.step(2, 6, 'Generazione package.json...');
 
+  await generatePackageJson(projectPath, config.name, opts);
+
+  logger.step(3, 6, 'Generazione file di configurazione...');
+
+  await generateConfigFiles(projectPath, config.name, opts);
+
+  logger.step(4, 6, 'Generazione configurazione database...');
+
+  await generateDatabaseConfig(projectPath, opts);
+
+  logger.step(5, 6, 'Generazione file sorgente...');
+
+  await generateSourceFiles(projectPath, opts);
+
+  logger.step(6, 6, 'Generazione README...');
+
+  await generateReadme(projectPath, config, opts);
+}
+
+// ============================================
+// PACKAGE.JSON
+// ============================================
+
+async function generatePackageJson(
+  projectPath: string,
+  projectName: string,
+  opts: ExpressOptions
+): Promise<void> {
   const dependencies: Record<string, string> = {
     'express': '^5.1.0',
     'cors': '^2.8.5',
@@ -54,7 +86,7 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
     'lint': 'eslint src/'
   };
 
-  // Aggiungi dipendenze database
+  // Database dependencies
   if (opts.database === 'mongodb') {
     dependencies['mongoose'] = '^8.14.1';
   }
@@ -68,8 +100,16 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
     scripts['db:studio'] = 'prisma studio';
   }
 
+  // Authentication dependencies
+  if (opts.authentication) {
+    dependencies['bcrypt'] = '^5.1.1';
+    dependencies['jsonwebtoken'] = '^9.0.2';
+    devDependencies['@types/bcrypt'] = '^5.0.2';
+    devDependencies['@types/jsonwebtoken'] = '^9.0.9';
+  }
+
   const packageJson = {
-    name: config.name,
+    name: projectName,
     version: '0.1.0',
     type: 'module',
     scripts,
@@ -78,9 +118,17 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
   };
 
   await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+}
 
-  logger.step(3, 6, 'Generazione file di configurazione...');
+// ============================================
+// CONFIG FILES
+// ============================================
 
+async function generateConfigFiles(
+  projectPath: string,
+  projectName: string,
+  opts: ExpressOptions
+): Promise<void> {
   // tsconfig.json
   const tsconfig = {
     compilerOptions: {
@@ -101,44 +149,36 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
 
   await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-  // .env.example
-  let envExample = `# Server
+  // .env.example e .env
+  let envContent = `# Server
 PORT=3000
 NODE_ENV=development
 `;
 
   if (opts.database === 'mongodb') {
-    envExample += `
+    envContent += `
 # MongoDB
-MONGODB_URI=mongodb://localhost:27017/${config.name}
+MONGODB_URI=mongodb://localhost:27017/${projectName}
 `;
   }
 
   if (opts.database === 'postgresql') {
-    envExample += `
+    envContent += `
 # PostgreSQL
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${config.name}?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${projectName}?schema=public"
 `;
   }
 
-  await writeFile(path.join(projectPath, '.env.example'), envExample);
-
-  // .env
-  let envFile = `PORT=3000
-NODE_ENV=development
-`;
-
-  if (opts.database === 'mongodb') {
-    envFile += `MONGODB_URI=mongodb://localhost:27017/${config.name}
+  if (opts.authentication) {
+    envContent += `
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=7d
 `;
   }
 
-  if (opts.database === 'postgresql') {
-    envFile += `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${config.name}?schema=public"
-`;
-  }
-
-  await writeFile(path.join(projectPath, '.env'), envFile);
+  await writeFile(path.join(projectPath, '.env.example'), envContent);
+  await writeFile(path.join(projectPath, '.env'), envContent);
 
   // .gitignore
   const gitignore = `# Dependencies
@@ -166,39 +206,255 @@ npm-debug.log*
 
   await writeFile(path.join(projectPath, '.gitignore'), gitignore);
 
-  // Docker Compose (se richiesto)
+  // Docker Compose
   if (opts.docker) {
-    await generateDockerCompose(projectPath, config.name, opts.database);
+    await generateDockerCompose(projectPath, projectName, opts.database);
   }
 
-  // Prisma schema (se PostgreSQL)
+  // Prisma schema
   if (opts.database === 'postgresql') {
-    await generatePrismaSchema(projectPath);
+    await generatePrismaSchema(projectPath, opts.authentication);
+  }
+}
+
+async function generateDockerCompose(
+  projectPath: string,
+  projectName: string,
+  database: string
+): Promise<void> {
+  let dockerCompose: string;
+
+  if (database === 'mongodb') {
+    dockerCompose = `services:
+  mongodb:
+    image: mongo:7
+    container_name: ${projectName}-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=${projectName}
+
+volumes:
+  mongodb_data:
+`;
+  } else {
+    dockerCompose = `services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${projectName}-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${projectName}
+
+volumes:
+  postgres_data:
+`;
   }
 
-  logger.step(4, 6, 'Generazione configurazione database...');
+  await writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
+}
 
+async function generatePrismaSchema(
+  projectPath: string,
+  withAuth: boolean
+): Promise<void> {
+  let prismaSchema = `generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+`;
+
+  if (withAuth) {
+    prismaSchema += `  password  String
+`;
+  }
+
+  prismaSchema += `  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+`;
+
+  await writeFile(path.join(projectPath, 'prisma', 'schema.prisma'), prismaSchema);
+}
+
+// ============================================
+// DATABASE CONFIG
+// ============================================
+
+async function generateDatabaseConfig(
+  projectPath: string,
+  opts: ExpressOptions
+): Promise<void> {
   // src/config/index.ts
-  await generateConfigFile(projectPath, opts.database);
+  let configFile = `import dotenv from 'dotenv';
+import { z } from 'zod';
 
-  // Database connection
+dotenv.config();
+
+const envSchema = z.object({
+  PORT: z.string().default('3000'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+`;
+
   if (opts.database === 'mongodb') {
-    await generateMongooseConnection(projectPath);
+    configFile += `  MONGODB_URI: z.string().min(1, 'MONGODB_URI è richiesto'),
+`;
   }
 
   if (opts.database === 'postgresql') {
-    await generatePrismaClient(projectPath);
+    configFile += `  DATABASE_URL: z.string().min(1, 'DATABASE_URL è richiesto'),
+`;
   }
 
-  logger.step(5, 6, 'Generazione file sorgente...');
+  if (opts.authentication) {
+    configFile += `  JWT_SECRET: z.string().min(1, 'JWT_SECRET è richiesto'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
+`;
+  }
 
-  // Genera modelli/schema di esempio
+  configFile += `});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('❌ Variabili d\\'ambiente non valide:', parsed.error.flatten());
+  process.exit(1);
+}
+
+export const config = {
+  port: parseInt(parsed.data.PORT, 10),
+  nodeEnv: parsed.data.NODE_ENV,
+  isDev: parsed.data.NODE_ENV === 'development',
+`;
+
   if (opts.database === 'mongodb') {
-    await generateMongooseModel(projectPath);
+    configFile += `  mongodbUri: parsed.data.MONGODB_URI,
+`;
   }
 
-  // src/types/index.ts
-  const typesFile = `import type { Request, Response, NextFunction } from 'express';
+  if (opts.database === 'postgresql') {
+    configFile += `  databaseUrl: parsed.data.DATABASE_URL,
+`;
+  }
+
+  if (opts.authentication) {
+    configFile += `  jwtSecret: parsed.data.JWT_SECRET,
+  jwtExpiresIn: parsed.data.JWT_EXPIRES_IN,
+`;
+  }
+
+  configFile += `};
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'config', 'index.ts'), configFile);
+
+  // Database connection file
+  if (opts.database === 'mongodb') {
+    const mongoConnection = `import mongoose from 'mongoose';
+import { config } from './index.js';
+
+export async function connectDatabase(): Promise<void> {
+  try {
+    await mongoose.connect(config.mongodbUri);
+    console.log('📦 Connesso a MongoDB');
+  } catch (error) {
+    console.error('❌ Errore connessione MongoDB:', error);
+    process.exit(1);
+  }
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  await mongoose.disconnect();
+  console.log('📦 Disconnesso da MongoDB');
+}
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), mongoConnection);
+  }
+
+  if (opts.database === 'postgresql') {
+    const prismaClient = `import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+
+export async function connectDatabase(): Promise<void> {
+  try {
+    await prisma.$connect();
+    console.log('📦 Connesso a PostgreSQL');
+  } catch (error) {
+    console.error('❌ Errore connessione PostgreSQL:', error);
+    process.exit(1);
+  }
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  await prisma.$disconnect();
+  console.log('📦 Disconnesso da PostgreSQL');
+}
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), prismaClient);
+  }
+}
+
+// ============================================
+// SOURCE FILES
+// ============================================
+
+async function generateSourceFiles(
+  projectPath: string,
+  opts: ExpressOptions
+): Promise<void> {
+  // Types
+  await generateTypes(projectPath, opts.authentication);
+
+  // Middlewares
+  await generateMiddlewares(projectPath, opts.authentication);
+
+  // Models (MongoDB only)
+  if (opts.database === 'mongodb') {
+    await generateMongooseModels(projectPath, opts.authentication);
+  }
+
+  // Controllers
+  await generateControllers(projectPath, opts);
+
+  // Routes
+  await generateRoutes(projectPath, opts);
+
+  // App
+  await generateApp(projectPath);
+
+  // Server
+  await generateServer(projectPath, opts.database);
+}
+
+async function generateTypes(projectPath: string, withAuth: boolean): Promise<void> {
+  let typesFile = `import type { Request, Response, NextFunction } from 'express';
 
 export type AsyncHandler = (
   req: Request,
@@ -213,9 +469,24 @@ export interface ApiResponse<T = unknown> {
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'types', 'index.ts'), typesFile);
+  if (withAuth) {
+    typesFile += `
+export interface JwtPayload {
+  userId: string;
+  email: string;
+}
 
-  // src/middlewares/errorHandler.ts
+export interface AuthRequest extends Request {
+  user?: JwtPayload;
+}
+`;
+  }
+
+  await writeFile(path.join(projectPath, 'src', 'types', 'index.ts'), typesFile);
+}
+
+async function generateMiddlewares(projectPath: string, withAuth: boolean): Promise<void> {
+  // Error handler
   const errorHandler = `import type { Request, Response, NextFunction } from 'express';
 import { config } from '../config/index.js';
 
@@ -254,7 +525,7 @@ export function errorHandler(
 
   await writeFile(path.join(projectPath, 'src', 'middlewares', 'errorHandler.ts'), errorHandler);
 
-  // src/middlewares/asyncHandler.ts
+  // Async handler
   const asyncHandler = `import type { Request, Response, NextFunction } from 'express';
 import type { AsyncHandler } from '../types/index.js';
 
@@ -267,11 +538,603 @@ export function asyncHandler(fn: AsyncHandler) {
 
   await writeFile(path.join(projectPath, 'src', 'middlewares', 'asyncHandler.ts'), asyncHandler);
 
-  // Controllers e Routes
-  await generateControllers(projectPath, opts.database);
-  await generateRoutes(projectPath, opts.database);
+  // Auth middleware
+  if (withAuth) {
+    const authMiddleware = `import type { Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+import { AppError } from './errorHandler.js';
+import type { AuthRequest, JwtPayload } from '../types/index.js';
 
-  // src/app.ts
+export function authenticate(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AppError(401, 'Token non fornito');
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    req.user = decoded;
+    next();
+  } catch {
+    throw new AppError(401, 'Token non valido o scaduto');
+  }
+}
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'middlewares', 'auth.ts'), authMiddleware);
+  }
+}
+
+async function generateMongooseModels(projectPath: string, withAuth: boolean): Promise<void> {
+  let userModel = `import mongoose, { Schema, Document } from 'mongoose';
+`;
+
+  if (withAuth) {
+    userModel += `import bcrypt from 'bcrypt';
+`;
+  }
+
+  userModel += `
+export interface IUser extends Document {
+  email: string;
+  name?: string;
+`;
+
+  if (withAuth) {
+    userModel += `  password: string;
+  comparePassword(candidatePassword: string): Promise<boolean>;
+`;
+  }
+
+  userModel += `  createdAt: Date;
+  updatedAt: Date;
+}
+
+const userSchema = new Schema<IUser>(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true
+    },
+    name: {
+      type: String,
+      trim: true
+    }`;
+
+  if (withAuth) {
+    userModel += `,
+    password: {
+      type: String,
+      required: true,
+      minlength: 6
+    }`;
+  }
+
+  userModel += `
+  },
+  {
+    timestamps: true
+  }
+);
+`;
+
+  if (withAuth) {
+    userModel += `
+// Hash password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Compare password method
+userSchema.methods.comparePassword = async function (
+  candidatePassword: string
+): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+`;
+  }
+
+  userModel += `
+export const User = mongoose.model<IUser>('User', userSchema);
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'models', 'User.ts'), userModel);
+
+  // Models index
+  const modelsIndex = `export { User } from './User.js';
+export type { IUser } from './User.js';
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'models', 'index.ts'), modelsIndex);
+}
+
+async function generateControllers(projectPath: string, opts: ExpressOptions): Promise<void> {
+  // Health controller
+  const healthController = `import type { Request, Response } from 'express';
+
+export function getHealth(_req: Request, res: Response): void {
+  res.json({
+    success: true,
+    data: {
+      status: 'ok',
+      timestamp: new Date().toISOString()
+    }
+  });
+}
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'controllers', 'healthController.ts'), healthController);
+
+  // Auth controller
+  if (opts.authentication) {
+    await generateAuthController(projectPath, opts.database);
+  }
+
+  // User controller
+  if (opts.database !== 'none') {
+    await generateUserController(projectPath, opts);
+  }
+}
+
+async function generateAuthController(projectPath: string, database: string): Promise<void> {
+  let authController: string;
+
+  if (database === 'mongodb') {
+    authController = `import type { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { User } from '../models/index.js';
+import { config } from '../config/index.js';
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { AppError } from '../middlewares/errorHandler.js';
+import type { AuthRequest } from '../types/index.js';
+
+// Genera JWT token
+function generateToken(userId: string, email: string): string {
+  return jwt.sign(
+    { userId, email },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
+  );
+}
+
+// POST /api/auth/register
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password, name } = req.body;
+
+  // Validazione base
+  if (!email || !password) {
+    throw new AppError(400, 'Email e password sono richiesti');
+  }
+
+  if (password.length < 6) {
+    throw new AppError(400, 'La password deve avere almeno 6 caratteri');
+  }
+
+  // Verifica se l'utente esiste già
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new AppError(400, 'Email già registrata');
+  }
+
+  // Crea l'utente
+  const user = await User.create({ email, password, name });
+
+  // Genera token
+  const token = generateToken(user._id.toString(), user.email);
+
+  res.status(201).json({
+    success: true,
+    data: {
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name
+      },
+      token
+    }
+  });
+});
+
+// POST /api/auth/login
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  // Validazione base
+  if (!email || !password) {
+    throw new AppError(400, 'Email e password sono richiesti');
+  }
+
+  // Trova l'utente
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new AppError(401, 'Credenziali non valide');
+  }
+
+  // Verifica password
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) {
+    throw new AppError(401, 'Credenziali non valide');
+  }
+
+  // Genera token
+  const token = generateToken(user._id.toString(), user.email);
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name
+      },
+      token
+    }
+  });
+});
+
+// GET /api/auth/me
+export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await User.findById(req.user?.userId).select('-password');
+
+  if (!user) {
+    throw new AppError(404, 'Utente non trovato');
+  }
+
+  res.json({
+    success: true,
+    data: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      createdAt: user.createdAt
+    }
+  });
+});
+`;
+  } else {
+    // PostgreSQL / Prisma
+    authController = `import type { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { prisma } from '../config/database.js';
+import { config } from '../config/index.js';
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { AppError } from '../middlewares/errorHandler.js';
+import type { AuthRequest } from '../types/index.js';
+
+// Genera JWT token
+function generateToken(userId: string, email: string): string {
+  return jwt.sign(
+    { userId, email },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
+  );
+}
+
+// POST /api/auth/register
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password, name } = req.body;
+
+  // Validazione base
+  if (!email || !password) {
+    throw new AppError(400, 'Email e password sono richiesti');
+  }
+
+  if (password.length < 6) {
+    throw new AppError(400, 'La password deve avere almeno 6 caratteri');
+  }
+
+  // Verifica se l'utente esiste già
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new AppError(400, 'Email già registrata');
+  }
+
+  // Hash password
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  // Crea l'utente
+  const user = await prisma.user.create({
+    data: { email, password: hashedPassword, name }
+  });
+
+  // Genera token
+  const token = generateToken(user.id, user.email);
+
+  res.status(201).json({
+    success: true,
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      },
+      token
+    }
+  });
+});
+
+// POST /api/auth/login
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  // Validazione base
+  if (!email || !password) {
+    throw new AppError(400, 'Email e password sono richiesti');
+  }
+
+  // Trova l'utente
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new AppError(401, 'Credenziali non valide');
+  }
+
+  // Verifica password
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    throw new AppError(401, 'Credenziali non valide');
+  }
+
+  // Genera token
+  const token = generateToken(user.id, user.email);
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      },
+      token
+    }
+  });
+});
+
+// GET /api/auth/me
+export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user?.userId },
+    select: { id: true, email: true, name: true, createdAt: true }
+  });
+
+  if (!user) {
+    throw new AppError(404, 'Utente non trovato');
+  }
+
+  res.json({
+    success: true,
+    data: user
+  });
+});
+`;
+  }
+
+  await writeFile(path.join(projectPath, 'src', 'controllers', 'authController.ts'), authController);
+}
+
+async function generateUserController(projectPath: string, opts: ExpressOptions): Promise<void> {
+  let userController: string;
+
+  if (opts.database === 'mongodb') {
+    userController = `import type { Request, Response } from 'express';
+import { User } from '../models/index.js';
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { AppError } from '../middlewares/errorHandler.js';
+
+export const getUsers = asyncHandler(async (_req: Request, res: Response) => {
+  const users = await User.find().select('-password -__v');
+  
+  res.json({
+    success: true,
+    data: users
+  });
+});
+
+export const getUserById = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = await User.findById(id).select('-password -__v');
+  
+  if (!user) {
+    throw new AppError(404, 'Utente non trovato');
+  }
+  
+  res.json({
+    success: true,
+    data: user
+  });
+});
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = await User.findByIdAndDelete(id);
+  
+  if (!user) {
+    throw new AppError(404, 'Utente non trovato');
+  }
+  
+  res.json({
+    success: true,
+    data: { message: 'Utente eliminato' }
+  });
+});
+`;
+  } else {
+    userController = `import type { Request, Response } from 'express';
+import { prisma } from '../config/database.js';
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { AppError } from '../middlewares/errorHandler.js';
+
+export const getUsers = asyncHandler(async (_req: Request, res: Response) => {
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, name: true, createdAt: true }
+  });
+  
+  res.json({
+    success: true,
+    data: users
+  });
+});
+
+export const getUserById = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, email: true, name: true, createdAt: true }
+  });
+  
+  if (!user) {
+    throw new AppError(404, 'Utente non trovato');
+  }
+  
+  res.json({
+    success: true,
+    data: user
+  });
+});
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  
+  try {
+    await prisma.user.delete({ where: { id } });
+    
+    res.json({
+      success: true,
+      data: { message: 'Utente eliminato' }
+    });
+  } catch {
+    throw new AppError(404, 'Utente non trovato');
+  }
+});
+`;
+  }
+
+  await writeFile(path.join(projectPath, 'src', 'controllers', 'userController.ts'), userController);
+}
+
+async function generateRoutes(projectPath: string, opts: ExpressOptions): Promise<void> {
+  // Health routes
+  const healthRoutes = `import { Router } from 'express';
+import { getHealth } from '../controllers/healthController.js';
+
+const router = Router();
+
+router.get('/', getHealth);
+
+export default router;
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'routes', 'healthRoutes.ts'), healthRoutes);
+
+  // Auth routes
+  if (opts.authentication) {
+    const authRoutes = `import { Router } from 'express';
+import { register, login, getMe } from '../controllers/authController.js';
+import { authenticate } from '../middlewares/auth.js';
+
+const router = Router();
+
+router.post('/register', register);
+router.post('/login', login);
+router.get('/me', authenticate, getMe);
+
+export default router;
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'routes', 'authRoutes.ts'), authRoutes);
+  }
+
+  // User routes
+  if (opts.database !== 'none') {
+    let userRoutes = `import { Router } from 'express';
+import { getUsers, getUserById, deleteUser } from '../controllers/userController.js';
+`;
+
+    if (opts.authentication) {
+      userRoutes += `import { authenticate } from '../middlewares/auth.js';
+
+const router = Router();
+
+// Tutte le route richiedono autenticazione
+router.use(authenticate);
+
+router.get('/', getUsers);
+router.get('/:id', getUserById);
+router.delete('/:id', deleteUser);
+`;
+    } else {
+      userRoutes += `
+const router = Router();
+
+router.get('/', getUsers);
+router.get('/:id', getUserById);
+router.delete('/:id', deleteUser);
+`;
+    }
+
+    userRoutes += `
+export default router;
+`;
+
+    await writeFile(path.join(projectPath, 'src', 'routes', 'userRoutes.ts'), userRoutes);
+  }
+
+  // Routes index
+  let routesIndex = `import { Router } from 'express';
+import healthRoutes from './healthRoutes.js';
+`;
+
+  if (opts.authentication) {
+    routesIndex += `import authRoutes from './authRoutes.js';
+`;
+  }
+
+  if (opts.database !== 'none') {
+    routesIndex += `import userRoutes from './userRoutes.js';
+`;
+  }
+
+  routesIndex += `
+const router = Router();
+
+router.use('/health', healthRoutes);
+`;
+
+  if (opts.authentication) {
+    routesIndex += `router.use('/auth', authRoutes);
+`;
+  }
+
+  if (opts.database !== 'none') {
+    routesIndex += `router.use('/users', userRoutes);
+`;
+  }
+
+  routesIndex += `
+export default router;
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'routes', 'index.ts'), routesIndex);
+}
+
+async function generateApp(projectPath: string): Promise<void> {
   const appFile = `import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -298,520 +1161,13 @@ export default app;
 `;
 
   await writeFile(path.join(projectPath, 'src', 'app.ts'), appFile);
-
-  // src/server.ts
-  const serverFile = generateServerFile(opts.database);
-  await writeFile(path.join(projectPath, 'src', 'server.ts'), serverFile);
-
-  logger.step(6, 6, 'Generazione README...');
-
-  // README.md
-  const readme = generateReadme(config, opts);
-  await writeFile(path.join(projectPath, 'README.md'), readme);
 }
 
-// Genera docker-compose.yml
-async function generateDockerCompose(
-  projectPath: string,
-  projectName: string,
-  database: string
-): Promise<void> {
-  let dockerCompose: string;
+async function generateServer(projectPath: string, database: string): Promise<void> {
+  let serverFile: string;
 
-  if (database === 'mongodb') {
-    dockerCompose = `version: '3.8'
-
-services:
-  mongodb:
-    image: mongo:7
-    container_name: ${projectName}-mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_DATABASE=${projectName}
-
-volumes:
-  mongodb_data:
-`;
-  } else {
-    dockerCompose = `version: '3.8'
-
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: ${projectName}-postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=${projectName}
-
-volumes:
-  postgres_data:
-`;
-  }
-
-  await writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
-}
-
-// Genera Prisma schema
-async function generatePrismaSchema(projectPath: string): Promise<void> {
-  const prismaSchema = `generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  posts     Post[]
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-}
-`;
-
-  await writeFile(path.join(projectPath, 'prisma', 'schema.prisma'), prismaSchema);
-}
-
-// Genera config file
-async function generateConfigFile(projectPath: string, database: string): Promise<void> {
-  let configFile = `import dotenv from 'dotenv';
-import { z } from 'zod';
-
-dotenv.config();
-
-const envSchema = z.object({
-  PORT: z.string().default('3000'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-`;
-
-  if (database === 'mongodb') {
-    configFile += `  MONGODB_URI: z.string().min(1, 'MONGODB_URI è richiesto'),
-`;
-  }
-
-  if (database === 'postgresql') {
-    configFile += `  DATABASE_URL: z.string().min(1, 'DATABASE_URL è richiesto'),
-`;
-  }
-
-  configFile += `});
-
-const parsed = envSchema.safeParse(process.env);
-
-if (!parsed.success) {
-  console.error('❌ Variabili d\\'ambiente non valide:', parsed.error.flatten());
-  process.exit(1);
-}
-
-export const config = {
-  port: parseInt(parsed.data.PORT, 10),
-  nodeEnv: parsed.data.NODE_ENV,
-  isDev: parsed.data.NODE_ENV === 'development',
-`;
-
-  if (database === 'mongodb') {
-    configFile += `  mongodbUri: parsed.data.MONGODB_URI,
-`;
-  }
-
-  if (database === 'postgresql') {
-    configFile += `  databaseUrl: parsed.data.DATABASE_URL,
-`;
-  }
-
-  configFile += `};
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'config', 'index.ts'), configFile);
-}
-
-// Genera connessione Mongoose
-async function generateMongooseConnection(projectPath: string): Promise<void> {
-  const dbFile = `import mongoose from 'mongoose';
-import { config } from './index.js';
-
-export async function connectDatabase(): Promise<void> {
-  try {
-    await mongoose.connect(config.mongodbUri);
-    console.log('📦 Connesso a MongoDB');
-  } catch (error) {
-    console.error('❌ Errore connessione MongoDB:', error);
-    process.exit(1);
-  }
-}
-
-export async function disconnectDatabase(): Promise<void> {
-  await mongoose.disconnect();
-  console.log('📦 Disconnesso da MongoDB');
-}
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), dbFile);
-}
-
-// Genera Prisma client
-async function generatePrismaClient(projectPath: string): Promise<void> {
-  const prismaClient = `import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
-
-export async function connectDatabase(): Promise<void> {
-  try {
-    await prisma.$connect();
-    console.log('📦 Connesso a PostgreSQL');
-  } catch (error) {
-    console.error('❌ Errore connessione PostgreSQL:', error);
-    process.exit(1);
-  }
-}
-
-export async function disconnectDatabase(): Promise<void> {
-  await prisma.$disconnect();
-  console.log('📦 Disconnesso da PostgreSQL');
-}
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), prismaClient);
-}
-
-// Genera modello Mongoose
-async function generateMongooseModel(projectPath: string): Promise<void> {
-  const userModel = `import mongoose, { Schema, Document } from 'mongoose';
-
-export interface IUser extends Document {
-  email: string;
-  name?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const userSchema = new Schema<IUser>(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true
-    },
-    name: {
-      type: String,
-      trim: true
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-export const User = mongoose.model<IUser>('User', userSchema);
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'models', 'User.ts'), userModel);
-
-  // Index file per i modelli
-  const modelsIndex = `export { User } from './User.js';
-export type { IUser } from './User.js';
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'models', 'index.ts'), modelsIndex);
-}
-
-// Genera controllers
-async function generateControllers(projectPath: string, database: string): Promise<void> {
-  // Health controller (sempre presente)
-  const healthController = `import type { Request, Response } from 'express';
-
-export function getHealth(_req: Request, res: Response): void {
-  res.json({
-    success: true,
-    data: {
-      status: 'ok',
-      timestamp: new Date().toISOString()
-    }
-  });
-}
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'controllers', 'healthController.ts'), healthController);
-
-  // User controller (se c'è un database)
-  if (database !== 'none') {
-    let userController: string;
-
-    if (database === 'mongodb') {
-      userController = `import type { Request, Response } from 'express';
-import { User } from '../models/index.js';
-import { asyncHandler } from '../middlewares/asyncHandler.js';
-import { AppError } from '../middlewares/errorHandler.js';
-
-export const getUsers = asyncHandler(async (_req: Request, res: Response) => {
-  const users = await User.find().select('-__v');
-  
-  res.json({
-    success: true,
-    data: users
-  });
-});
-
-export const getUserById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const user = await User.findById(id).select('-__v');
-  
-  if (!user) {
-    throw new AppError(404, 'Utente non trovato');
-  }
-  
-  res.json({
-    success: true,
-    data: user
-  });
-});
-
-export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, name } = req.body;
-  
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new AppError(400, 'Email già registrata');
-  }
-  
-  const user = await User.create({ email, name });
-  
-  res.status(201).json({
-    success: true,
-    data: user
-  });
-});
-
-export const updateUser = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { email, name } = req.body;
-  
-  const user = await User.findByIdAndUpdate(
-    id,
-    { email, name },
-    { new: true, runValidators: true }
-  ).select('-__v');
-  
-  if (!user) {
-    throw new AppError(404, 'Utente non trovato');
-  }
-  
-  res.json({
-    success: true,
-    data: user
-  });
-});
-
-export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const user = await User.findByIdAndDelete(id);
-  
-  if (!user) {
-    throw new AppError(404, 'Utente non trovato');
-  }
-  
-  res.json({
-    success: true,
-    data: { message: 'Utente eliminato' }
-  });
-});
-`;
-    } else {
-      userController = `import type { Request, Response } from 'express';
-import { prisma } from '../config/database.js';
-import { asyncHandler } from '../middlewares/asyncHandler.js';
-import { AppError } from '../middlewares/errorHandler.js';
-
-export const getUsers = asyncHandler(async (_req: Request, res: Response) => {
-  const users = await prisma.user.findMany({
-    include: { posts: true }
-  });
-  
-  res.json({
-    success: true,
-    data: users
-  });
-});
-
-export const getUserById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const user = await prisma.user.findUnique({
-    where: { id },
-    include: { posts: true }
-  });
-  
-  if (!user) {
-    throw new AppError(404, 'Utente non trovato');
-  }
-  
-  res.json({
-    success: true,
-    data: user
-  });
-});
-
-export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, name } = req.body;
-  
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    throw new AppError(400, 'Email già registrata');
-  }
-  
-  const user = await prisma.user.create({
-    data: { email, name }
-  });
-  
-  res.status(201).json({
-    success: true,
-    data: user
-  });
-});
-
-export const updateUser = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { email, name } = req.body;
-  
-  try {
-    const user = await prisma.user.update({
-      where: { id },
-      data: { email, name }
-    });
-    
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch {
-    throw new AppError(404, 'Utente non trovato');
-  }
-});
-
-export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  
-  try {
-    await prisma.user.delete({ where: { id } });
-    
-    res.json({
-      success: true,
-      data: { message: 'Utente eliminato' }
-    });
-  } catch {
-    throw new AppError(404, 'Utente non trovato');
-  }
-});
-`;
-    }
-
-    await writeFile(path.join(projectPath, 'src', 'controllers', 'userController.ts'), userController);
-  }
-}
-
-// Genera routes
-async function generateRoutes(projectPath: string, database: string): Promise<void> {
-  // Health routes
-  const healthRoutes = `import { Router } from 'express';
-import { getHealth } from '../controllers/healthController.js';
-
-const router = Router();
-
-router.get('/', getHealth);
-
-export default router;
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'routes', 'healthRoutes.ts'), healthRoutes);
-
-  // User routes (se c'è un database)
-  if (database !== 'none') {
-    const userRoutes = `import { Router } from 'express';
-import {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser
-} from '../controllers/userController.js';
-
-const router = Router();
-
-router.get('/', getUsers);
-router.get('/:id', getUserById);
-router.post('/', createUser);
-router.put('/:id', updateUser);
-router.delete('/:id', deleteUser);
-
-export default router;
-`;
-
-    await writeFile(path.join(projectPath, 'src', 'routes', 'userRoutes.ts'), userRoutes);
-  }
-
-  // Index routes
-  let routesIndex = `import { Router } from 'express';
-import healthRoutes from './healthRoutes.js';
-`;
-
-  if (database !== 'none') {
-    routesIndex += `import userRoutes from './userRoutes.js';
-`;
-  }
-
-  routesIndex += `
-const router = Router();
-
-router.use('/health', healthRoutes);
-`;
-
-  if (database !== 'none') {
-    routesIndex += `router.use('/users', userRoutes);
-`;
-  }
-
-  routesIndex += `
-export default router;
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'routes', 'index.ts'), routesIndex);
-}
-
-// Genera server file
-function generateServerFile(database: string): string {
   if (database === 'none') {
-    return `import app from './app.js';
+    serverFile = `import app from './app.js';
 import { config } from './config/index.js';
 
 app.listen(config.port, () => {
@@ -819,33 +1175,38 @@ app.listen(config.port, () => {
   console.log(\`📍 Health check: http://localhost:\${config.port}/api/health\`);
 });
 `;
-  }
-
-  return `import app from './app.js';
+  } else {
+    serverFile = `import app from './app.js';
 import { config } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 
 async function bootstrap() {
-  // Connetti al database
   await connectDatabase();
   
-  // Avvia il server
   app.listen(config.port, () => {
     console.log(\`🚀 Server avviato su http://localhost:\${config.port}\`);
     console.log(\`📍 Health check: http://localhost:\${config.port}/api/health\`);
+    console.log(\`📍 Auth API: http://localhost:\${config.port}/api/auth\`);
     console.log(\`📍 Users API: http://localhost:\${config.port}/api/users\`);
   });
 }
 
 bootstrap().catch(console.error);
 `;
+  }
+
+  await writeFile(path.join(projectPath, 'src', 'server.ts'), serverFile);
 }
 
-// Genera README
-function generateReadme(
+// ============================================
+// README
+// ============================================
+
+async function generateReadme(
+  projectPath: string,
   config: ProjectConfig,
-  opts: { database: string; docker: boolean }
-): string {
+  opts: ExpressOptions
+): Promise<void> {
   const features = [
     'Express.js 5',
     'TypeScript',
@@ -853,17 +1214,10 @@ function generateReadme(
     'Helmet + CORS (sicurezza)'
   ];
 
-  if (opts.database === 'mongodb') {
-    features.push('MongoDB + Mongoose');
-  }
-
-  if (opts.database === 'postgresql') {
-    features.push('PostgreSQL + Prisma');
-  }
-
-  if (opts.docker) {
-    features.push('Docker Compose');
-  }
+  if (opts.database === 'mongodb') features.push('MongoDB + Mongoose');
+  if (opts.database === 'postgresql') features.push('PostgreSQL + Prisma');
+  if (opts.authentication) features.push('Autenticazione JWT');
+  if (opts.docker) features.push('Docker Compose');
 
   let readme = `# ${config.name}
 
@@ -872,28 +1226,6 @@ API Express.js + TypeScript creata con Create Project CLI.
 ## Funzionalità
 
 ${features.map(f => `- ${f}`).join('\n')}
-
-## Struttura del progetto
-
-\`\`\`
-src/
-├── config/        # Configurazione e database
-├── controllers/   # Gestori delle richieste
-├── middlewares/   # Middleware Express
-├── routes/        # Definizione delle route
-├── services/      # Logica di business
-├── types/         # Tipi TypeScript
-├── utils/         # Funzioni di utilità
-`;
-
-  if (opts.database === 'mongodb') {
-    readme += `├── models/        # Modelli Mongoose
-`;
-  }
-
-  readme += `├── app.ts         # Configurazione Express
-└── server.ts      # Entry point
-\`\`\`
 
 ## Setup
 
@@ -914,7 +1246,7 @@ docker-compose up -d
 # Genera il client Prisma
 ${config.packageManager} run db:generate
 
-# Esegui le migrazioni
+# Push dello schema
 ${config.packageManager} run db:push
 `;
   }
@@ -924,47 +1256,76 @@ ${config.packageManager} run db:push
 ${config.packageManager} run dev
 \`\`\`
 
+## API Endpoints
+
+### Health
+- \`GET /api/health\` - Health check
+`;
+
+  if (opts.authentication) {
+    readme += `
+### Autenticazione
+- \`POST /api/auth/register\` - Registrazione
+- \`POST /api/auth/login\` - Login
+- \`GET /api/auth/me\` - Profilo utente (richiede token)
+`;
+  }
+
+  if (opts.database !== 'none') {
+    readme += `
+### Utenti${opts.authentication ? ' (richiede token)' : ''}
+- \`GET /api/users\` - Lista utenti
+- \`GET /api/users/:id\` - Dettaglio utente
+- \`DELETE /api/users/:id\` - Elimina utente
+`;
+  }
+
+  if (opts.authentication) {
+    readme += `
+## Autenticazione
+
+### Registrazione
+\`\`\`bash
+curl -X POST http://localhost:3000/api/auth/register \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "test@example.com", "password": "password123", "name": "Test User"}'
+\`\`\`
+
+### Login
+\`\`\`bash
+curl -X POST http://localhost:3000/api/auth/login \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "test@example.com", "password": "password123"}'
+\`\`\`
+
+### Accesso a route protette
+\`\`\`bash
+curl http://localhost:3000/api/auth/me \\
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+\`\`\`
+`;
+  }
+
+  readme += `
 ## Comandi disponibili
 
 \`\`\`bash
-# Avvia in modalità sviluppo
-${config.packageManager} run dev
-
-# Build per produzione
-${config.packageManager} run build
-
-# Avvia la versione compilata
-${config.packageManager} start
-
-# Lint del codice
-${config.packageManager} run lint
+${config.packageManager} run dev      # Sviluppo con hot reload
+${config.packageManager} run build    # Build per produzione
+${config.packageManager} start        # Avvia build di produzione
+${config.packageManager} run lint     # Lint del codice
 `;
 
   if (opts.database === 'postgresql') {
-    readme += `
-# Database (Prisma)
-${config.packageManager} run db:generate  # Genera il client
-${config.packageManager} run db:push      # Push dello schema
-${config.packageManager} run db:migrate   # Crea una migrazione
+    readme += `${config.packageManager} run db:generate  # Genera client Prisma
+${config.packageManager} run db:push      # Push schema al database
+${config.packageManager} run db:migrate   # Crea migrazione
 ${config.packageManager} run db:studio    # Apri Prisma Studio
 `;
   }
 
   readme += `\`\`\`
-
-## API Endpoints
-
-- \`GET /api/health\` - Health check
 `;
 
-  if (opts.database !== 'none') {
-    readme += `- \`GET /api/users\` - Lista utenti
-- \`GET /api/users/:id\` - Dettaglio utente
-- \`POST /api/users\` - Crea utente
-- \`PUT /api/users/:id\` - Aggiorna utente
-- \`DELETE /api/users/:id\` - Elimina utente
-`;
-  }
-
-  return readme;
+  await writeFile(path.join(projectPath, 'README.md'), readme);
 }

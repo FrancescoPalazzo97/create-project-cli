@@ -25,9 +25,9 @@ export interface AstroOptions {
 // Opzioni specifiche per Express
 export interface ExpressOptions {
     database: Database;
+    authentication: boolean;
     docker: boolean;
 }
-
 export interface ProjectConfig {
     name: string;
     framework: Framework;

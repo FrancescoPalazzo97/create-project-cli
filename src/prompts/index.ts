@@ -86,16 +86,22 @@ async function promptExpressOptions(): Promise<ExpressOptions> {
         ]
     });
 
+    let authentication = false;
     let docker = false;
 
     if (database !== 'none') {
+        authentication = await confirm({
+            message: 'Vuoi aggiungere autenticazione JWT?',
+            default: true
+        });
+
         docker = await confirm({
             message: 'Vuoi aggiungere Docker Compose per il database?',
             default: true
         });
     }
 
-    return { database, docker };
+    return { database, authentication, docker };
 }
 
 export async function promptProjectConfig(
