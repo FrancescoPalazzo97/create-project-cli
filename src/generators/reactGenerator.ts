@@ -15,7 +15,33 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
-  // Crea le directory
+  await createDirectoryStructure(projectPath, opts);
+
+  logger.step(2, 5, 'Generazione package.json...');
+
+  await generatePackageJson(projectPath, config.name, opts);
+
+  logger.step(3, 5, 'Generazione file di configurazione...');
+
+  await generateConfigFiles(projectPath, config.name, opts);
+
+  logger.step(4, 5, 'Generazione file sorgente...');
+
+  await generateSourceFiles(projectPath, config.name, config, opts);
+
+  logger.step(5, 5, 'Generazione README...');
+
+  await generateReadme(projectPath, config, opts);
+}
+
+// ============================================
+// DIRECTORY STRUCTURE
+// ============================================
+
+async function createDirectoryStructure(
+  projectPath: string,
+  opts: { reactRouter: boolean; zustand: boolean }
+): Promise<void> {
   await createDirectory(path.join(projectPath, 'src', 'components'));
   await createDirectory(path.join(projectPath, 'src', 'hooks'));
   await createDirectory(path.join(projectPath, 'src', 'utils'));
@@ -29,10 +55,17 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
   if (opts.zustand) {
     await createDirectory(path.join(projectPath, 'src', 'store'));
   }
+}
 
-  logger.step(2, 5, 'Generazione package.json...');
+// ============================================
+// PACKAGE.JSON
+// ============================================
 
-  // package.json dinamico
+async function generatePackageJson(
+  projectPath: string,
+  projectName: string,
+  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean }
+): Promise<void> {
   const dependencies: Record<string, string> = {
     'react': '^19.1.0',
     'react-dom': '^19.1.0'
@@ -52,7 +85,6 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
     'vite': '^6.3.5'
   };
 
-  // Aggiungi dipendenze opzionali
   if (opts.reactRouter) {
     dependencies['react-router-dom'] = '^7.6.0';
   }
@@ -67,7 +99,7 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
   }
 
   const packageJson = {
-    name: config.name,
+    name: projectName,
     private: true,
     version: '0.1.0',
     type: 'module',
@@ -82,9 +114,17 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
   };
 
   await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+}
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+// ============================================
+// CONFIG FILES
+// ============================================
 
+async function generateConfigFiles(
+  projectPath: string,
+  projectName: string,
+  opts: { tailwind: boolean }
+): Promise<void> {
   // tsconfig.json
   const tsconfig = {
     compilerOptions: {
@@ -162,7 +202,7 @@ npm-debug.log*
 
   await writeFile(path.join(projectPath, '.gitignore'), gitignore);
 
-  // vite-env.d.ts - dichiarazioni TypeScript per Vite
+  // vite-env.d.ts
   const viteEnv = `/// <reference types="vite/client" />
 
 declare module '*.css' {
@@ -197,9 +237,18 @@ declare module '*.jpg' {
 `;
 
   await writeFile(path.join(projectPath, 'src', 'vite-env.d.ts'), viteEnv);
+}
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+// ============================================
+// SOURCE FILES
+// ============================================
 
+async function generateSourceFiles(
+  projectPath: string,
+  projectName: string,
+  config: ProjectConfig,
+  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
+): Promise<void> {
   // index.html
   const indexHtml = `<!DOCTYPE html>
 <html lang="it">
@@ -207,7 +256,7 @@ declare module '*.jpg' {
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${config.name}</title>
+    <title>${projectName}</title>
   </head>
   <body>
     <div id="root"></div>
@@ -218,15 +267,16 @@ declare module '*.jpg' {
 
   await writeFile(path.join(projectPath, 'index.html'), indexHtml);
 
-  // Genera file in base alle opzioni
+  // Zustand store
   if (opts.zustand) {
     await generateZustandStore(projectPath);
   }
 
+  // React Router o file base
   if (opts.reactRouter) {
-    await generateReactRouterFiles(projectPath, config.name, opts);
+    await generateReactRouterFiles(projectPath, projectName, opts);
   } else {
-    await generateBasicFiles(projectPath, config.name, opts);
+    await generateBasicFiles(projectPath, projectName, opts);
   }
 
   // CSS
@@ -245,10 +295,17 @@ declare module '*.jpg' {
   if (opts.githubActions) {
     await generateReactWorkflow(projectPath, config);
   }
+}
 
-  logger.step(5, 5, 'Generazione README...');
+// ============================================
+// README
+// ============================================
 
-  // README.md
+async function generateReadme(
+  projectPath: string,
+  config: ProjectConfig,
+  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
+): Promise<void> {
   const features = [
     'React 19',
     'TypeScript',
