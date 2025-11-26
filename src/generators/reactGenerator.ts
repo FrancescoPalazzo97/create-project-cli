@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
 import { generateReactWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
+import { generateCounterStore } from '../templates/zustand.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -322,24 +323,10 @@ ${config.packageManager} run lint
 
 // Genera lo store Zustand
 async function generateZustandStore(projectPath: string): Promise<void> {
-  const storeFile = `import { create } from 'zustand';
-
-interface CounterState {
-  count: number;
-  increment: () => void;
-  decrement: () => void;
-  reset: () => void;
-}
-
-export const useCounterStore = create<CounterState>((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 })),
-  decrement: () => set((state) => ({ count: state.count - 1 })),
-  reset: () => set({ count: 0 })
-}));
-`;
-
-  await writeFile(path.join(projectPath, 'src', 'store', 'counterStore.ts'), storeFile);
+  await writeFile(
+    path.join(projectPath, 'src', 'store', 'counterStore.ts'),
+    generateCounterStore()
+  );
 }
 
 // Genera file con React Router
