@@ -5,6 +5,7 @@ import type { ProjectConfig, NextOptions } from '../types/index.js';
 import { generateNextWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
 import { generateCounterStore } from '../templates/zustand.js';
+import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -500,43 +501,16 @@ async function generateReadme(
     ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
-  const readme = `# ${config.name}
-
-Progetto Next.js + TypeScript creato con Create Project CLI.
-
-## Funzionalità
-
-${features.map(f => `- ${f}`).join('\n')}
-
-## Struttura del progetto
-
-\`\`\`
-src/
-├── app/           # App Router (pages, layouts, routes)
-│   ├── layout.tsx # Layout principale
-│   ├── page.tsx   # Homepage
-│   └── globals.css
-├── components/    # Componenti React riutilizzabili
-├── lib/           # Utility e funzioni condivise
-${opts.zustand ? '├── store/         # Store Zustand\n' : ''}└── types/         # Tipi TypeScript
-\`\`\`
-
-## Comandi disponibili
-
-\`\`\`bash
-# Avvia il server di sviluppo
-${config.packageManager} run dev
-
-# Build per produzione
-${config.packageManager} run build
-
-# Avvia il server di produzione
-${config.packageManager} start
-
-# Lint del codice
-${config.packageManager} run lint
-\`\`\`
-`;
+  const readme = generateReadmeTemplate({
+    projectName: config.name,
+    description: 'Progetto Next.js + TypeScript creato con Create Project CLI.',
+    features,
+    packageManager: config.packageManager,
+    commands: commonCommands.next(config.packageManager),
+    sections: [
+      projectStructureSections.next({ zustand: opts.zustand })
+    ]
+  });
 
   await writeFile(path.join(projectPath, 'README.md'), readme);
 }

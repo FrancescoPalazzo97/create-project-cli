@@ -5,6 +5,7 @@ import type { ProjectConfig } from '../types/index.js';
 import { generateReactWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
 import { generateCounterStore } from '../templates/zustand.js';
+import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -293,30 +294,16 @@ async function generateReadme(
     ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
-  const readme = `# ${config.name}
-
-Progetto React + TypeScript creato con Create Project CLI.
-
-## Funzionalità
-
-${features.map(f => `- ${f}`).join('\n')}
-
-## Comandi disponibili
-
-\`\`\`bash
-# Avvia il server di sviluppo
-${config.packageManager} run dev
-
-# Build per produzione
-${config.packageManager} run build
-
-# Preview della build
-${config.packageManager} run preview
-
-# Lint del codice
-${config.packageManager} run lint
-\`\`\`
-`;
+  const readme = generateReadmeTemplate({
+    projectName: config.name,
+    description: 'Progetto React + TypeScript creato con Create Project CLI.',
+    features,
+    packageManager: config.packageManager,
+    commands: commonCommands.vite(config.packageManager),
+    sections: [
+      projectStructureSections.react({ reactRouter: opts.reactRouter, zustand: opts.zustand })
+    ]
+  });
 
   await writeFile(path.join(projectPath, 'README.md'), readme);
 }

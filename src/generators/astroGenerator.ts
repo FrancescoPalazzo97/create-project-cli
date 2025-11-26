@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig, AstroOptions } from '../types/index.js';
 import { generateAstroWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
+import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
 
 export async function generateAstroProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -649,44 +650,23 @@ async function generateReadme(
     ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
-  const readme = `# ${config.name}
-
-Sito Astro + TypeScript creato con Create Project CLI.
-
-## Funzionalità
-
-${features.map(f => `- ${f}`).join('\n')}
-
-## Struttura del progetto
-
-\`\`\`
-src/
-├── components/    # Componenti riutilizzabili (.astro)
-├── layouts/       # Layout delle pagine
-├── pages/         # Route del sito (file-based routing)
-└── styles/        # Stili globali
-public/            # Asset statici
-\`\`\`
-
-## Comandi disponibili
-
-\`\`\`bash
-# Avvia il server di sviluppo
-${config.packageManager} run dev
-
-# Build per produzione
-${config.packageManager} run build
-
-# Preview della build
-${config.packageManager} run preview
-\`\`\`
-
-## Risorse utili
+  const additionalContent = `## Risorse utili
 
 - [Documentazione Astro](https://docs.astro.build)
 - [Astro Components](https://docs.astro.build/en/core-concepts/astro-components/)
-${opts.tailwind ? '- [Tailwind CSS](https://tailwindcss.com/docs)\n' : ''}- [Astro Integrations](https://astro.build/integrations/)
-`;
+${opts.tailwind ? '- [Tailwind CSS](https://tailwindcss.com/docs)\n' : ''}- [Astro Integrations](https://astro.build/integrations/)`;
+
+  const readme = generateReadmeTemplate({
+    projectName: config.name,
+    description: 'Sito Astro + TypeScript creato con Create Project CLI.',
+    features,
+    packageManager: config.packageManager,
+    commands: commonCommands.astro(config.packageManager),
+    sections: [
+      projectStructureSections.astro()
+    ],
+    additionalContent
+  });
 
   await writeFile(path.join(projectPath, 'README.md'), readme);
 }

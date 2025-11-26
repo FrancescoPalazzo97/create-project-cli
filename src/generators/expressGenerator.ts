@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig, ExpressOptions } from '../types/index.js';
 import { generateExpressWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
+import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections, type ReadmeSection } from '../templates/readme.js';
 
 export async function generateExpressProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -1528,30 +1529,30 @@ async function generateReadme(
   if (opts.swagger) features.push('Swagger/OpenAPI');
   if (opts.githubActions) features.push('GitHub Actions CI/CD');
 
-  let readme = `# ${config.name}
+  // Costruisce le sezioni custom
+  const sections: ReadmeSection[] = [];
 
-API Express.js + TypeScript creata con Create Project CLI.
+  // Sezione struttura del progetto
+  sections.push(projectStructureSections.express({
+    database: opts.database !== 'none',
+    auth: opts.authentication
+  }));
 
-## Funzionalità
-
-${features.map(f => `- ${f}`).join('\n')}
-
-## Setup
-
-\`\`\`bash
+  // Sezione Setup
+  let setupContent = `\`\`\`bash
 # Installa le dipendenze
 ${config.packageManager} install
 `;
 
   if (opts.docker) {
-    readme += `
+    setupContent += `
 # Avvia il database con Docker
 docker-compose up -d
 `;
   }
 
   if (opts.database === 'postgresql') {
-    readme += `
+    setupContent += `
 # Genera il client Prisma
 ${config.packageManager} run db:generate
 
@@ -1560,19 +1561,20 @@ ${config.packageManager} run db:push
 `;
   }
 
-  readme += `
+  setupContent += `
 # Avvia il server
 ${config.packageManager} run dev
-\`\`\`
+\`\`\``;
 
-## API Endpoints
+  sections.push({ title: 'Setup', content: setupContent });
 
-### Health
+  // Sezione API Endpoints
+  let endpointsContent = `### Health
 - \`GET /api/health\` - Health check
 `;
 
   if (opts.authentication) {
-    readme += `
+    endpointsContent += `
 ### Autenticazione
 - \`POST /api/auth/register\` - Registrazione
 - \`POST /api/auth/login\` - Login
@@ -1581,7 +1583,7 @@ ${config.packageManager} run dev
   }
 
   if (opts.database !== 'none') {
-    readme += `
+    endpointsContent += `
 ### Utenti${opts.authentication ? ' (richiede token)' : ''}
 - \`GET /api/users\` - Lista utenti
 - \`GET /api/users/:id\` - Dettaglio utente
@@ -1589,22 +1591,24 @@ ${config.packageManager} run dev
 `;
   }
 
-  if (opts.swagger) {
-    readme += `
-## Documentazione API
+  sections.push({ title: 'API Endpoints', content: endpointsContent });
 
-La documentazione interattiva delle API è disponibile su:
+  // Sezione Documentazione API (se Swagger)
+  if (opts.swagger) {
+    sections.push({
+      title: 'Documentazione API',
+      content: `La documentazione interattiva delle API è disponibile su:
 \`\`\`
 http://localhost:3000/api/docs
-\`\`\`
-`;
+\`\`\``
+    });
   }
 
+  // Sezione Autenticazione (se JWT)
   if (opts.authentication) {
-    readme += `
-## Autenticazione
-
-### Registrazione
+    sections.push({
+      title: 'Autenticazione',
+      content: `### Registrazione
 \`\`\`bash
 curl -X POST http://localhost:3000/api/auth/register \\
   -H "Content-Type: application/json" \\
@@ -1622,30 +1626,18 @@ curl -X POST http://localhost:3000/api/auth/login \\
 \`\`\`bash
 curl http://localhost:3000/api/auth/me \\
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
-\`\`\`
-`;
+\`\`\``
+    });
   }
 
-  readme += `
-## Comandi disponibili
-
-\`\`\`bash
-${config.packageManager} run dev      # Sviluppo con hot reload
-${config.packageManager} run build    # Build per produzione
-${config.packageManager} start        # Avvia build di produzione
-${config.packageManager} run lint     # Lint del codice
-`;
-
-  if (opts.database === 'postgresql') {
-    readme += `${config.packageManager} run db:generate  # Genera client Prisma
-${config.packageManager} run db:push      # Push schema al database
-${config.packageManager} run db:migrate   # Crea migrazione
-${config.packageManager} run db:studio    # Apri Prisma Studio
-`;
-  }
-
-  readme += `\`\`\`
-`;
+  const readme = generateReadmeTemplate({
+    projectName: config.name,
+    description: 'API Express.js + TypeScript creata con Create Project CLI.',
+    features,
+    packageManager: config.packageManager,
+    commands: commonCommands.express(config.packageManager, opts.database === 'postgresql'),
+    sections
+  });
 
   await writeFile(path.join(projectPath, 'README.md'), readme);
 }
