@@ -2,10 +2,14 @@ import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
+import { generateAstroWorkflow } from './githubActionsGenerator.js';
 
 export async function generateAstroProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.astroOptions || { tailwind: false };
+  const opts = config.astroOptions || {
+    tailwind: false,
+    githubActions: false
+  };
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
@@ -562,12 +566,18 @@ import Footer from '../components/Footer.astro';
 
   await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
 
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateAstroWorkflow(projectPath, config);
+  }
+
   logger.step(5, 5, 'Generazione README...');
 
   const features = [
     'Astro 5',
     'TypeScript',
-    ...(opts.tailwind ? ['Tailwind CSS'] : [])
+    ...(opts.tailwind ? ['Tailwind CSS'] : []),
+    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
   const readme = `# ${config.name}

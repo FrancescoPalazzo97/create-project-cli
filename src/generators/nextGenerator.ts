@@ -2,10 +2,15 @@ import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
+import { generateNextWorkflow } from './githubActionsGenerator.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.nextOptions || { tailwind: false, zustand: false };
+  const opts = config.nextOptions || {
+    tailwind: false,
+    zustand: false,
+    githubActions: false
+  };
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
@@ -451,6 +456,11 @@ export default function Home() {
 
   await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
 
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateNextWorkflow(projectPath, config);
+  }
+
   logger.step(5, 5, 'Generazione README...');
 
   const features = [
@@ -459,7 +469,8 @@ export default function Home() {
     'TypeScript',
     'App Router',
     ...(opts.tailwind ? ['Tailwind CSS'] : []),
-    ...(opts.zustand ? ['Zustand'] : [])
+    ...(opts.zustand ? ['Zustand'] : []),
+    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
   const readme = `# ${config.name}

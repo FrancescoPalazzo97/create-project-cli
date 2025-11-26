@@ -2,6 +2,7 @@ import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig, ExpressOptions } from '../types/index.js';
+import { generateExpressWorkflow } from './githubActionsGenerator.js';
 
 export async function generateExpressProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
@@ -9,7 +10,8 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
     database: 'none',
     authentication: false,
     swagger: false,
-    docker: false
+    docker: false,
+    githubActions: false
   };
 
   logger.step(1, 6, 'Creazione struttura cartelle...');
@@ -45,7 +47,7 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
 
   logger.step(5, 6, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, config.name, opts);
+  await generateSourceFiles(projectPath, config.name, config, opts);
 
   logger.step(6, 6, 'Generazione README...');
 
@@ -481,6 +483,7 @@ export const swaggerSpec = swaggerJsdoc(options);
 async function generateSourceFiles(
   projectPath: string,
   projectName: string,
+  config: ProjectConfig,
   opts: ExpressOptions
 ): Promise<void> {
   // Types
@@ -504,6 +507,11 @@ async function generateSourceFiles(
 
   // Routes
   await generateRoutes(projectPath, opts);
+
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateExpressWorkflow(projectPath, config, opts.database);
+  }
 
   // App
   await generateApp(projectPath, opts);
@@ -1540,6 +1548,7 @@ async function generateReadme(
   if (opts.authentication) features.push('Autenticazione JWT');
   if (opts.docker) features.push('Docker Compose');
   if (opts.swagger) features.push('Swagger/OpenAPI');
+  if (opts.githubActions) features.push('GitHub Actions CI/CD');
 
   let readme = `# ${config.name}
 

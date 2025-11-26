@@ -9,17 +9,20 @@ export interface ReactOptions {
     tailwind: boolean;
     reactRouter: boolean;
     zustand: boolean;
+    githubActions: boolean;
 }
 
 // Opzioni specifiche per Next.js
 export interface NextOptions {
     tailwind: boolean;
     zustand: boolean;
+    githubActions: boolean;
 }
 
 // Opzioni specifiche per Astro
 export interface AstroOptions {
     tailwind: boolean;
+    githubActions: boolean;
 }
 
 // Opzioni specifiche per Express
@@ -28,6 +31,7 @@ export interface ExpressOptions {
     authentication: boolean;
     swagger: boolean;
     docker: boolean;
+    githubActions: boolean;
 }
 
 export interface ProjectConfig {

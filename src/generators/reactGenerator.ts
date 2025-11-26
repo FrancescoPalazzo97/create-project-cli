@@ -2,10 +2,16 @@ import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
 import type { ProjectConfig } from '../types/index.js';
+import { generateReactWorkflow } from './githubActionsGenerator.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.reactOptions || { tailwind: false, reactRouter: false, zustand: false };
+  const opts = config.reactOptions || {
+    tailwind: false,
+    reactRouter: false,
+    zustand: false,
+    githubActions: false
+  };
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
@@ -235,6 +241,11 @@ declare module '*.jpg' {
 
   await writeFile(path.join(projectPath, 'public', 'vite.svg'), viteSvg);
 
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateReactWorkflow(projectPath, config);
+  }
+
   logger.step(5, 5, 'Generazione README...');
 
   // README.md
@@ -244,7 +255,8 @@ declare module '*.jpg' {
     'Vite',
     ...(opts.tailwind ? ['Tailwind CSS'] : []),
     ...(opts.reactRouter ? ['React Router'] : []),
-    ...(opts.zustand ? ['Zustand'] : [])
+    ...(opts.zustand ? ['Zustand'] : []),
+    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
   ];
 
   const readme = `# ${config.name}

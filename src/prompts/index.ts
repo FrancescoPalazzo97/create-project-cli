@@ -32,7 +32,8 @@ async function promptReactOptions(): Promise<ReactOptions> {
     const choices = [
         { name: 'Tailwind CSS', value: 'tailwind' },
         { name: 'React Router', value: 'reactRouter' },
-        { name: 'Zustand (State Management)', value: 'zustand' }
+        { name: 'Zustand (State Management)', value: 'zustand' },
+        { name: 'GitHub Actions (CI/CD)', value: 'githubActions' }
     ];
 
     const selected = await checkbox({
@@ -43,7 +44,8 @@ async function promptReactOptions(): Promise<ReactOptions> {
     return {
         tailwind: selected.includes('tailwind'),
         reactRouter: selected.includes('reactRouter'),
-        zustand: selected.includes('zustand')
+        zustand: selected.includes('zustand'),
+        githubActions: selected.includes('githubActions')
     };
 }
 
@@ -51,7 +53,8 @@ async function promptReactOptions(): Promise<ReactOptions> {
 async function promptNextOptions(): Promise<NextOptions> {
     const choices = [
         { name: 'Tailwind CSS', value: 'tailwind' },
-        { name: 'Zustand (State Management)', value: 'zustand' }
+        { name: 'Zustand (State Management)', value: 'zustand' },
+        { name: 'GitHub Actions (CI/CD)', value: 'githubActions' }
     ];
 
     const selected = await checkbox({
@@ -61,18 +64,27 @@ async function promptNextOptions(): Promise<NextOptions> {
 
     return {
         tailwind: selected.includes('tailwind'),
-        zustand: selected.includes('zustand')
+        zustand: selected.includes('zustand'),
+        githubActions: selected.includes('githubActions')
     };
 }
 
 // Prompt per opzioni Astro
 async function promptAstroOptions(): Promise<AstroOptions> {
-    const tailwind = await confirm({
-        message: 'Vuoi aggiungere Tailwind CSS?',
-        default: false
+    const choices = [
+        { name: 'Tailwind CSS', value: 'tailwind' },
+        { name: 'GitHub Actions (CI/CD)', value: 'githubActions' }
+    ];
+
+    const selected = await checkbox({
+        message: 'Quali funzionalità vuoi aggiungere?',
+        choices
     });
 
-    return { tailwind };
+    return {
+        tailwind: selected.includes('tailwind'),
+        githubActions: selected.includes('githubActions')
+    };
 }
 
 // Prompt per opzioni Express
@@ -107,7 +119,12 @@ async function promptExpressOptions(): Promise<ExpressOptions> {
         default: true
     });
 
-    return { database, authentication, swagger, docker };
+    const githubActions = await confirm({
+        message: 'Vuoi aggiungere GitHub Actions (CI/CD)?',
+        default: false
+    });
+
+    return { database, authentication, swagger, docker, githubActions };
 }
 
 export async function promptProjectConfig(
