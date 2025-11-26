@@ -87,6 +87,7 @@ async function promptExpressOptions(): Promise<ExpressOptions> {
     });
 
     let authentication = false;
+    let swagger = false;
     let docker = false;
 
     if (database !== 'none') {
@@ -101,7 +102,12 @@ async function promptExpressOptions(): Promise<ExpressOptions> {
         });
     }
 
-    return { database, authentication, docker };
+    swagger = await confirm({
+        message: 'Vuoi aggiungere Swagger per la documentazione API?',
+        default: true
+    });
+
+    return { database, authentication, swagger, docker };
 }
 
 export async function promptProjectConfig(

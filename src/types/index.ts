@@ -26,8 +26,10 @@ export interface AstroOptions {
 export interface ExpressOptions {
     database: Database;
     authentication: boolean;
+    swagger: boolean;
     docker: boolean;
 }
+
 export interface ProjectConfig {
     name: string;
     framework: Framework;

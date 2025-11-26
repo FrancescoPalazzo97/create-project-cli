@@ -8,6 +8,7 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
   const opts: ExpressOptions = config.expressOptions || {
     database: 'none',
     authentication: false,
+    swagger: false,
     docker: false
   };
 
@@ -44,7 +45,7 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
 
   logger.step(5, 6, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, opts);
+  await generateSourceFiles(projectPath, config.name, opts);
 
   logger.step(6, 6, 'Generazione README...');
 
@@ -106,6 +107,14 @@ async function generatePackageJson(
     dependencies['jsonwebtoken'] = '^9.0.2';
     devDependencies['@types/bcrypt'] = '^5.0.2';
     devDependencies['@types/jsonwebtoken'] = '^9.0.9';
+  }
+
+  // Swagger dependencies
+  if (opts.swagger) {
+    dependencies['swagger-ui-express'] = '^5.0.1';
+    dependencies['swagger-jsdoc'] = '^6.2.8';
+    devDependencies['@types/swagger-ui-express'] = '^4.1.8';
+    devDependencies['@types/swagger-jsdoc'] = '^6.0.4';
   }
 
   const packageJson = {
@@ -422,11 +431,56 @@ export async function disconnectDatabase(): Promise<void> {
 }
 
 // ============================================
+// SWAGGER CONFIG
+// ============================================
+
+async function generateSwaggerConfig(
+  projectPath: string,
+  projectName: string,
+  opts: ExpressOptions
+): Promise<void> {
+  const swaggerConfig = `import swaggerJsdoc from 'swagger-jsdoc';
+
+const options: swaggerJsdoc.Options = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: '${projectName} API',
+      version: '1.0.0',
+      description: 'API documentation for ${projectName}',
+    },
+    servers: [
+      {
+        url: 'http://localhost:3000',
+        description: 'Development server',
+      },
+    ],
+${opts.authentication ? `    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },` : ''}
+  },
+  apis: ['./src/routes/*.ts'],
+};
+
+export const swaggerSpec = swaggerJsdoc(options);
+`;
+
+  await writeFile(path.join(projectPath, 'src', 'config', 'swagger.ts'), swaggerConfig);
+}
+
+// ============================================
 // SOURCE FILES
 // ============================================
 
 async function generateSourceFiles(
   projectPath: string,
+  projectName: string,
   opts: ExpressOptions
 ): Promise<void> {
   // Types
@@ -440,6 +494,11 @@ async function generateSourceFiles(
     await generateMongooseModels(projectPath, opts.authentication);
   }
 
+  // Swagger config
+  if (opts.swagger) {
+    await generateSwaggerConfig(projectPath, projectName, opts);
+  }
+
   // Controllers
   await generateControllers(projectPath, opts);
 
@@ -447,10 +506,10 @@ async function generateSourceFiles(
   await generateRoutes(projectPath, opts);
 
   // App
-  await generateApp(projectPath);
+  await generateApp(projectPath, opts);
 
   // Server
-  await generateServer(projectPath, opts.database);
+  await generateServer(projectPath, opts);
 }
 
 async function generateTypes(projectPath: string, withAuth: boolean): Promise<void> {
@@ -1031,12 +1090,42 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
 
 async function generateRoutes(projectPath: string, opts: ExpressOptions): Promise<void> {
   // Health routes
-  const healthRoutes = `import { Router } from 'express';
+  let healthRoutes = `import { Router } from 'express';
 import { getHealth } from '../controllers/healthController.js';
 
 const router = Router();
 
-router.get('/', getHealth);
+`;
+
+  if (opts.swagger) {
+    healthRoutes += `/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Health check
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     timestamp:
+ *                       type: string
+ */
+`;
+  }
+
+  healthRoutes += `router.get('/', getHealth);
 
 export default router;
 `;
@@ -1045,18 +1134,148 @@ export default router;
 
   // Auth routes
   if (opts.authentication) {
-    const authRoutes = `import { Router } from 'express';
+    let authRoutes = `import { Router } from 'express';
 import { register, login, getMe } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
 const router = Router();
 
+`;
+
+    if (opts.swagger) {
+      authRoutes += `/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         email:
+ *           type: string
+ *         name:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *     AuthResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         data:
+ *           type: object
+ *           properties:
+ *             user:
+ *               $ref: '#/components/schemas/User'
+ *             token:
+ *               type: string
+ */
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Registra un nuovo utente
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *               name:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Utente registrato con successo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Dati non validi o email già registrata
+ */
 router.post('/register', register);
+
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login utente
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login effettuato con successo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       401:
+ *         description: Credenziali non valide
+ */
+router.post('/login', login);
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Ottieni profilo utente corrente
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profilo utente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Token non valido o mancante
+ */
+router.get('/me', authenticate, getMe);
+
+export default router;
+`;
+    } else {
+      authRoutes += `router.post('/register', register);
 router.post('/login', login);
 router.get('/me', authenticate, getMe);
 
 export default router;
 `;
+    }
 
     await writeFile(path.join(projectPath, 'src', 'routes', 'authRoutes.ts'), authRoutes);
   }
@@ -1069,29 +1288,112 @@ import { getUsers, getUserById, deleteUser } from '../controllers/userController
 
     if (opts.authentication) {
       userRoutes += `import { authenticate } from '../middlewares/auth.js';
-
-const router = Router();
-
-// Tutte le route richiedono autenticazione
-router.use(authenticate);
-
-router.get('/', getUsers);
-router.get('/:id', getUserById);
-router.delete('/:id', deleteUser);
-`;
-    } else {
-      userRoutes += `
-const router = Router();
-
-router.get('/', getUsers);
-router.get('/:id', getUserById);
-router.delete('/:id', deleteUser);
 `;
     }
 
     userRoutes += `
+const router = Router();
+
+`;
+
+    if (opts.authentication) {
+      userRoutes += `// Tutte le route richiedono autenticazione
+router.use(authenticate);
+
+`;
+    }
+
+    if (opts.swagger) {
+      userRoutes += `/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Ottieni lista utenti
+ *     tags: [Users]
+${opts.authentication ? `*     security:
+ *       - bearerAuth: []` : ''}
+ *     responses:
+ *       200:
+ *         description: Lista degli utenti
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ */
+router.get('/', getUsers);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Ottieni utente per ID
+ *     tags: [Users]
+${opts.authentication ? `*     security:
+ *       - bearerAuth: []` : ''}
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID dell'utente
+ *     responses:
+ *       200:
+ *         description: Dettaglio utente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       404:
+ *         description: Utente non trovato
+ */
+router.get('/:id', getUserById);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Elimina utente
+ *     tags: [Users]
+${opts.authentication ? `*     security:
+ *       - bearerAuth: []` : ''}
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID dell'utente
+ *     responses:
+ *       200:
+ *         description: Utente eliminato
+ *       404:
+ *         description: Utente non trovato
+ */
+router.delete('/:id', deleteUser);
+
 export default router;
 `;
+    } else {
+      userRoutes += `router.get('/', getUsers);
+router.get('/:id', getUserById);
+router.delete('/:id', deleteUser);
+
+export default router;
+`;
+    }
 
     await writeFile(path.join(projectPath, 'src', 'routes', 'userRoutes.ts'), userRoutes);
   }
@@ -1134,11 +1436,19 @@ export default router;
   await writeFile(path.join(projectPath, 'src', 'routes', 'index.ts'), routesIndex);
 }
 
-async function generateApp(projectPath: string): Promise<void> {
-  const appFile = `import express from 'express';
+async function generateApp(projectPath: string, opts: ExpressOptions): Promise<void> {
+  let appFile = `import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import routes from './routes/index.js';
+`;
+
+  if (opts.swagger) {
+    appFile += `import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger.js';
+`;
+  }
+
+  appFile += `import routes from './routes/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
@@ -1150,7 +1460,16 @@ app.use(cors());
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+`;
 
+  if (opts.swagger) {
+    appFile += `
+// Swagger documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+`;
+  }
+
+  appFile += `
 // Routes
 app.use('/api', routes);
 
@@ -1163,16 +1482,17 @@ export default app;
   await writeFile(path.join(projectPath, 'src', 'app.ts'), appFile);
 }
 
-async function generateServer(projectPath: string, database: string): Promise<void> {
+async function generateServer(projectPath: string, opts: ExpressOptions): Promise<void> {
   let serverFile: string;
 
-  if (database === 'none') {
+  if (opts.database === 'none') {
     serverFile = `import app from './app.js';
 import { config } from './config/index.js';
 
 app.listen(config.port, () => {
   console.log(\`🚀 Server avviato su http://localhost:\${config.port}\`);
   console.log(\`📍 Health check: http://localhost:\${config.port}/api/health\`);
+${opts.swagger ? `  console.log(\`📚 Swagger docs: http://localhost:\${config.port}/api/docs\`);` : ''}
 });
 `;
   } else {
@@ -1186,8 +1506,9 @@ async function bootstrap() {
   app.listen(config.port, () => {
     console.log(\`🚀 Server avviato su http://localhost:\${config.port}\`);
     console.log(\`📍 Health check: http://localhost:\${config.port}/api/health\`);
-    console.log(\`📍 Auth API: http://localhost:\${config.port}/api/auth\`);
-    console.log(\`📍 Users API: http://localhost:\${config.port}/api/users\`);
+${opts.authentication ? `    console.log(\`🔐 Auth API: http://localhost:\${config.port}/api/auth\`);` : ''}
+    console.log(\`👥 Users API: http://localhost:\${config.port}/api/users\`);
+${opts.swagger ? `    console.log(\`📚 Swagger docs: http://localhost:\${config.port}/api/docs\`);` : ''}
   });
 }
 
@@ -1218,6 +1539,7 @@ async function generateReadme(
   if (opts.database === 'postgresql') features.push('PostgreSQL + Prisma');
   if (opts.authentication) features.push('Autenticazione JWT');
   if (opts.docker) features.push('Docker Compose');
+  if (opts.swagger) features.push('Swagger/OpenAPI');
 
   let readme = `# ${config.name}
 
@@ -1277,6 +1599,17 @@ ${config.packageManager} run dev
 - \`GET /api/users\` - Lista utenti
 - \`GET /api/users/:id\` - Dettaglio utente
 - \`DELETE /api/users/:id\` - Elimina utente
+`;
+  }
+
+  if (opts.swagger) {
+    readme += `
+## Documentazione API
+
+La documentazione interattiva delle API è disponibile su:
+\`\`\`
+http://localhost:3000/api/docs
+\`\`\`
 `;
   }
 
