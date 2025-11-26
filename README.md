@@ -15,6 +15,9 @@
 - 🎨 **Prompts interattivi** - Interfaccia user-friendly con validazione
 - 🔧 **Git ready** - Inizializzazione automatica del repository
 - 📝 **Template completi** - Codice di esempio e strutture best-practice
+- 🔐 **Autenticazione JWT** - Sistema di autenticazione pronto all'uso (Express)
+- 📚 **Documentazione API** - Swagger UI integrato (Express)
+- 🚢 **CI/CD ready** - Workflow GitHub Actions pre-configurati
 
 ## Installazione
 
@@ -38,10 +41,10 @@ Il CLI ti guiderà attraverso una serie di domande:
 - Nome del progetto
 - Framework da utilizzare (React, Astro, Next.js, Express)
 - Funzionalità aggiuntive specifiche per framework:
-  - **React**: Tailwind CSS, React Router, Zustand
-  - **Next.js**: Tailwind CSS, Zustand
-  - **Astro**: Tailwind CSS
-  - **Express**: Database (MongoDB, PostgreSQL), Docker Compose
+  - **React**: Tailwind CSS, React Router, Zustand, GitHub Actions
+  - **Next.js**: Tailwind CSS, Zustand, GitHub Actions
+  - **Astro**: Tailwind CSS, GitHub Actions
+  - **Express**: Database (MongoDB, PostgreSQL), Autenticazione JWT, Swagger API Docs, Docker Compose, GitHub Actions
 - Package manager (npm, yarn, pnpm)
 - Inizializzare repository Git
 - Installare le dipendenze automaticamente
@@ -92,6 +95,7 @@ Setup completo con:
 - **Tailwind CSS**: Configurazione completa con PostCSS e file di configurazione
 - **React Router**: Routing client-side con setup di esempio
 - **Zustand**: State management leggero e moderno
+- **GitHub Actions**: Workflow CI/CD con build, lint e test automatici
 
 **Comandi disponibili:**
 ```bash
@@ -112,6 +116,7 @@ Setup completo con:
 
 **Opzioni aggiuntive:**
 - **Tailwind CSS**: Integrazione Astro con configurazione ottimizzata
+- **GitHub Actions**: Workflow CI/CD per build e deploy automatico su GitHub Pages
 
 **Comandi disponibili:**
 ```bash
@@ -133,6 +138,7 @@ Setup completo con:
 **Opzioni aggiuntive:**
 - **Tailwind CSS**: Configurazione Next.js ottimizzata con supporto App Router
 - **Zustand**: State management con supporto Server Components
+- **GitHub Actions**: Workflow CI/CD con build, lint e ottimizzazioni Next.js
 
 **Comandi disponibili:**
 ```bash
@@ -159,25 +165,39 @@ Setup completo con:
 - **PostgreSQL**: Integrazione con Prisma ORM
   - Schema Prisma di esempio
   - Comandi per migrazione e gestione database
+- **Autenticazione JWT**: Sistema completo di autenticazione con bcrypt e JWT
+  - Middleware di autenticazione
+  - Hash password con bcrypt
+  - Generazione e validazione token JWT
+  - Endpoint di login e registrazione
+- **Swagger**: Documentazione API interattiva
+  - Interfaccia Swagger UI integrata
+  - Documentazione automatica degli endpoint
+  - Testing API direttamente dal browser
 - **Docker Compose**: Setup locale del database
   - Configurazione pronta per MongoDB o PostgreSQL
   - Variabili d'ambiente pre-configurate
+- **GitHub Actions**: Workflow CI/CD con database services
+  - Build e lint automatici
+  - Integrazione database in ambiente CI
 
 **Struttura progetto:**
 ```
 src/
-├── config/        # Configurazione e variabili d'ambiente
-├── controllers/   # Gestori delle richieste
-├── middlewares/   # Middleware Express
-├── routes/        # Definizione delle route
-├── services/      # Logica di business
-├── models/        # Model Mongoose (se MongoDB selezionato)
-├── types/         # Tipi TypeScript
-├── utils/         # Funzioni di utilità
-├── app.ts         # Configurazione Express
-└── server.ts      # Entry point
-prisma/            # Schema Prisma (se PostgreSQL selezionato)
+├── config/           # Configurazione e variabili d'ambiente
+├── controllers/      # Gestori delle richieste
+├── middlewares/      # Middleware Express (incluso auth se selezionato)
+├── routes/           # Definizione delle route
+├── services/         # Logica di business
+├── models/           # Model Mongoose (se MongoDB selezionato)
+├── types/            # Tipi TypeScript
+├── utils/            # Funzioni di utilità
+├── app.ts            # Configurazione Express (incluso Swagger se selezionato)
+└── server.ts         # Entry point
+prisma/               # Schema Prisma (se PostgreSQL selezionato)
 └── schema.prisma
+.github/workflows/    # GitHub Actions (se selezionato)
+└── ci.yml
 ```
 
 **Comandi disponibili:**
@@ -291,22 +311,23 @@ create-project create test-project
 
 ```
 src/
-├── generators/          # Generator per ogni framework
-│   ├── index.ts        # Router dei generator
+├── generators/              # Generator per ogni framework
+│   ├── index.ts            # Router dei generator
 │   ├── reactGenerator.ts
 │   ├── astroGenerator.ts
 │   ├── nextGenerator.ts
-│   └── expressGenerator.ts
+│   ├── expressGenerator.ts
+│   └── githubActionsGenerator.ts  # Workflow CI/CD
 ├── prompts/
-│   └── index.ts        # Prompts interattivi
+│   └── index.ts            # Prompts interattivi
 ├── types/
-│   └── index.ts        # Type definitions
+│   └── index.ts            # Type definitions
 ├── utils/
-│   ├── fileSystem.ts   # Operazioni file system
-│   ├── shell.ts        # Comandi shell
-│   ├── logger.ts       # Logging colorato
-│   └── index.ts        # Re-exports
-└── index.ts            # Entry point CLI
+│   ├── fileSystem.ts       # Operazioni file system
+│   ├── shell.ts            # Comandi shell
+│   ├── logger.ts           # Logging colorato
+│   └── index.ts            # Re-exports
+└── index.ts                # Entry point CLI
 ```
 
 ### Aggiungere un Nuovo Framework
