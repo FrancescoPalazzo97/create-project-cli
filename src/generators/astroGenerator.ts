@@ -1,26 +1,58 @@
 import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
-import type { ProjectConfig } from '../types/index.js';
+import type { ProjectConfig, AstroOptions } from '../types/index.js';
 import { generateAstroWorkflow } from './githubActionsGenerator.js';
 
 export async function generateAstroProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.astroOptions || {
+  const opts: AstroOptions = config.astroOptions || {
     tailwind: false,
     githubActions: false
   };
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
+  await createDirectoryStructure(projectPath);
+
+  logger.step(2, 5, 'Generazione package.json...');
+
+  await generatePackageJson(projectPath, config.name, opts);
+
+  logger.step(3, 5, 'Generazione file di configurazione...');
+
+  await generateConfigFiles(projectPath, opts);
+
+  logger.step(4, 5, 'Generazione file sorgente...');
+
+  await generateSourceFiles(projectPath, config, opts);
+
+  logger.step(5, 5, 'Generazione README...');
+
+  await generateReadme(projectPath, config, opts);
+}
+
+// ============================================
+// DIRECTORY STRUCTURE
+// ============================================
+
+async function createDirectoryStructure(projectPath: string): Promise<void> {
   await createDirectory(path.join(projectPath, 'src', 'components'));
   await createDirectory(path.join(projectPath, 'src', 'layouts'));
   await createDirectory(path.join(projectPath, 'src', 'pages'));
   await createDirectory(path.join(projectPath, 'src', 'styles'));
   await createDirectory(path.join(projectPath, 'public'));
+}
 
-  logger.step(2, 5, 'Generazione package.json...');
+// ============================================
+// PACKAGE.JSON
+// ============================================
 
+async function generatePackageJson(
+  projectPath: string,
+  projectName: string,
+  opts: AstroOptions
+): Promise<void> {
   const dependencies: Record<string, string> = {
     'astro': '^5.7.13'
   };
@@ -36,7 +68,7 @@ export async function generateAstroProject(config: ProjectConfig): Promise<void>
   }
 
   const packageJson = {
-    name: config.name,
+    name: projectName,
     type: 'module',
     version: '0.1.0',
     scripts: {
@@ -50,9 +82,16 @@ export async function generateAstroProject(config: ProjectConfig): Promise<void>
   };
 
   await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+}
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+// ============================================
+// CONFIG FILES
+// ============================================
 
+async function generateConfigFiles(
+  projectPath: string,
+  opts: AstroOptions
+): Promise<void> {
   // astro.config.mjs
   let astroConfig: string;
 
@@ -127,10 +166,49 @@ node_modules/
 `;
 
   await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+}
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+// ============================================
+// SOURCE FILES
+// ============================================
 
-  // src/styles/global.css
+async function generateSourceFiles(
+  projectPath: string,
+  config: ProjectConfig,
+  opts: AstroOptions
+): Promise<void> {
+  // Styles
+  await generateStyles(projectPath, config.name, opts);
+
+  // Layouts
+  await generateLayouts(projectPath, config.name, opts);
+
+  // Components
+  await generateComponents(projectPath, config.name, opts);
+
+  // Pages
+  await generatePages(projectPath, config.name, opts);
+
+  // Public assets
+  const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <circle cx="18" cy="18" r="16" fill="#4f46e5"/>
+  <text x="18" y="24" text-anchor="middle" font-size="20" fill="white">A</text>
+</svg>
+`;
+
+  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
+
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateAstroWorkflow(projectPath, config);
+  }
+}
+
+async function generateStyles(
+  projectPath: string,
+  _projectName: string,
+  opts: AstroOptions
+): Promise<void> {
   let globalCss: string;
 
   if (opts.tailwind) {
@@ -174,8 +252,13 @@ a:hover {
   }
 
   await writeFile(path.join(projectPath, 'src', 'styles', 'global.css'), globalCss);
+}
 
-  // src/layouts/BaseLayout.astro
+async function generateLayouts(
+  projectPath: string,
+  projectName: string,
+  opts: AstroOptions
+): Promise<void> {
   let baseLayout: string;
 
   if (opts.tailwind) {
@@ -185,7 +268,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = '${config.name} - Sito creato con Astro' } = Astro.props;
+const { title, description = '${projectName} - Sito creato con Astro' } = Astro.props;
 ---
 
 <!DOCTYPE html>
@@ -213,7 +296,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = '${config.name} - Sito creato con Astro' } = Astro.props;
+const { title, description = '${projectName} - Sito creato con Astro' } = Astro.props;
 ---
 
 <!DOCTYPE html>
@@ -237,8 +320,14 @@ const { title, description = '${config.name} - Sito creato con Astro' } = Astro.
   }
 
   await writeFile(path.join(projectPath, 'src', 'layouts', 'BaseLayout.astro'), baseLayout);
+}
 
-  // src/components/Header.astro
+async function generateComponents(
+  projectPath: string,
+  projectName: string,
+  opts: AstroOptions
+): Promise<void> {
+  // Header component
   let headerComponent: string;
 
   if (opts.tailwind) {
@@ -247,7 +336,7 @@ interface Props {
   siteName?: string;
 }
 
-const { siteName = '${config.name}' } = Astro.props;
+const { siteName = '${projectName}' } = Astro.props;
 ---
 
 <header class="bg-white shadow-sm">
@@ -276,7 +365,7 @@ interface Props {
   siteName?: string;
 }
 
-const { siteName = '${config.name}' } = Astro.props;
+const { siteName = '${projectName}' } = Astro.props;
 ---
 
 <header>
@@ -330,7 +419,7 @@ const { siteName = '${config.name}' } = Astro.props;
 
   await writeFile(path.join(projectPath, 'src', 'components', 'Header.astro'), headerComponent);
 
-  // src/components/Footer.astro
+  // Footer component
   let footerComponent: string;
 
   if (opts.tailwind) {
@@ -340,7 +429,7 @@ const year = new Date().getFullYear();
 
 <footer class="border-t border-gray-200 mt-auto py-8 text-center">
   <p class="text-gray-500 text-sm">
-    &copy; {year} ${config.name}. Creato con Astro.
+    &copy; {year} ${projectName}. Creato con Astro.
   </p>
 </footer>
 `;
@@ -350,7 +439,7 @@ const year = new Date().getFullYear();
 ---
 
 <footer>
-  <p>&copy; {year} ${config.name}. Creato con Astro.</p>
+  <p>&copy; {year} ${projectName}. Creato con Astro.</p>
 </footer>
 
 <style>
@@ -370,8 +459,14 @@ const year = new Date().getFullYear();
   }
 
   await writeFile(path.join(projectPath, 'src', 'components', 'Footer.astro'), footerComponent);
+}
 
-  // src/pages/index.astro
+async function generatePages(
+  projectPath: string,
+  projectName: string,
+  opts: AstroOptions
+): Promise<void> {
+  // Index page
   let indexPage: string;
 
   if (opts.tailwind) {
@@ -381,19 +476,19 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 ---
 
-<BaseLayout title="${config.name}">
+<BaseLayout title="${projectName}">
   <Header />
-  
+
   <main class="flex-1">
     <section class="max-w-3xl mx-auto px-4 py-16 text-center">
       <h1 class="text-4xl font-bold text-gray-900 mb-4">
-        Benvenuto in ${config.name}
+        Benvenuto in ${projectName}
       </h1>
       <p class="text-xl text-gray-600 mb-8">
         Il tuo nuovo progetto Astro è pronto.
       </p>
-      <a 
-        href="/about" 
+      <a
+        href="/about"
         class="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
       >
         Scopri di più
@@ -411,12 +506,12 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 ---
 
-<BaseLayout title="${config.name}">
+<BaseLayout title="${projectName}">
   <Header />
-  
+
   <main>
     <section class="hero">
-      <h1>Benvenuto in ${config.name}</h1>
+      <h1>Benvenuto in ${projectName}</h1>
       <p>Il tuo nuovo progetto Astro è pronto.</p>
       <a href="/about" class="button">Scopri di più</a>
     </section>
@@ -468,7 +563,7 @@ import Footer from '../components/Footer.astro';
 
   await writeFile(path.join(projectPath, 'src', 'pages', 'index.astro'), indexPage);
 
-  // src/pages/about.astro
+  // About page
   let aboutPage: string;
 
   if (opts.tailwind) {
@@ -478,18 +573,18 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 ---
 
-<BaseLayout title="About - ${config.name}">
+<BaseLayout title="About - ${projectName}">
   <Header />
-  
+
   <main class="flex-1">
     <article class="max-w-2xl mx-auto px-4 py-12">
       <h1 class="text-3xl font-bold text-gray-900 mb-6">About</h1>
       <p class="text-gray-600 leading-relaxed mb-4">
-        Questo è un progetto creato con <strong class="text-gray-900">Astro</strong> e 
+        Questo è un progetto creato con <strong class="text-gray-900">Astro</strong> e
         <strong class="text-gray-900">TypeScript</strong> usando Create Project CLI.
       </p>
       <p class="text-gray-600 leading-relaxed mb-6">
-        Astro è un framework moderno per costruire siti web veloci 
+        Astro è un framework moderno per costruire siti web veloci
         e content-focused con meno JavaScript.
       </p>
       <a href="/" class="text-indigo-600 hover:text-indigo-700 font-medium">
@@ -508,18 +603,18 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 ---
 
-<BaseLayout title="About - ${config.name}">
+<BaseLayout title="About - ${projectName}">
   <Header />
-  
+
   <main>
     <article>
       <h1>About</h1>
       <p>
-        Questo è un progetto creato con <strong>Astro</strong> e 
+        Questo è un progetto creato con <strong>Astro</strong> e
         <strong>TypeScript</strong> usando Create Project CLI.
       </p>
       <p>
-        Astro è un framework moderno per costruire siti web veloci 
+        Astro è un framework moderno per costruire siti web veloci
         e content-focused con meno JavaScript.
       </p>
       <a href="/">← Torna alla home</a>
@@ -556,23 +651,17 @@ import Footer from '../components/Footer.astro';
   }
 
   await writeFile(path.join(projectPath, 'src', 'pages', 'about.astro'), aboutPage);
+}
 
-  // public/favicon.svg
-  const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
-  <circle cx="18" cy="18" r="16" fill="#4f46e5"/>
-  <text x="18" y="24" text-anchor="middle" font-size="20" fill="white">A</text>
-</svg>
-`;
+// ============================================
+// README
+// ============================================
 
-  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
-
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateAstroWorkflow(projectPath, config);
-  }
-
-  logger.step(5, 5, 'Generazione README...');
-
+async function generateReadme(
+  projectPath: string,
+  config: ProjectConfig,
+  opts: AstroOptions
+): Promise<void> {
   const features = [
     'Astro 5',
     'TypeScript',

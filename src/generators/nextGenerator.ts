@@ -1,12 +1,12 @@
 import path from 'node:path';
 import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
 import { logger } from '../utils/logger.js';
-import type { ProjectConfig } from '../types/index.js';
+import type { ProjectConfig, NextOptions } from '../types/index.js';
 import { generateNextWorkflow } from './githubActionsGenerator.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
   const projectPath = path.resolve(config.directory);
-  const opts = config.nextOptions || {
+  const opts: NextOptions = config.nextOptions || {
     tailwind: false,
     zustand: false,
     githubActions: false
@@ -14,6 +14,33 @@ export async function generateNextProject(config: ProjectConfig): Promise<void> 
 
   logger.step(1, 5, 'Creazione struttura cartelle...');
 
+  await createDirectoryStructure(projectPath, opts);
+
+  logger.step(2, 5, 'Generazione package.json...');
+
+  await generatePackageJson(projectPath, config.name, opts);
+
+  logger.step(3, 5, 'Generazione file di configurazione...');
+
+  await generateConfigFiles(projectPath, opts);
+
+  logger.step(4, 5, 'Generazione file sorgente...');
+
+  await generateSourceFiles(projectPath, config, opts);
+
+  logger.step(5, 5, 'Generazione README...');
+
+  await generateReadme(projectPath, config, opts);
+}
+
+// ============================================
+// DIRECTORY STRUCTURE
+// ============================================
+
+async function createDirectoryStructure(
+  projectPath: string,
+  opts: NextOptions
+): Promise<void> {
   await createDirectory(path.join(projectPath, 'src', 'app'));
   await createDirectory(path.join(projectPath, 'src', 'components'));
   await createDirectory(path.join(projectPath, 'src', 'lib'));
@@ -23,9 +50,17 @@ export async function generateNextProject(config: ProjectConfig): Promise<void> 
   if (opts.zustand) {
     await createDirectory(path.join(projectPath, 'src', 'store'));
   }
+}
 
-  logger.step(2, 5, 'Generazione package.json...');
+// ============================================
+// PACKAGE.JSON
+// ============================================
 
+async function generatePackageJson(
+  projectPath: string,
+  projectName: string,
+  opts: NextOptions
+): Promise<void> {
   const dependencies: Record<string, string> = {
     'next': '^15.3.2',
     'react': '^19.1.0',
@@ -51,7 +86,7 @@ export async function generateNextProject(config: ProjectConfig): Promise<void> 
   }
 
   const packageJson = {
-    name: config.name,
+    name: projectName,
     version: '0.1.0',
     private: true,
     scripts: {
@@ -65,9 +100,16 @@ export async function generateNextProject(config: ProjectConfig): Promise<void> 
   };
 
   await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+}
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+// ============================================
+// CONFIG FILES
+// ============================================
 
+async function generateConfigFiles(
+  projectPath: string,
+  opts: NextOptions
+): Promise<void> {
   // next.config.ts
   const nextConfig = `import type { NextConfig } from 'next';
 
@@ -165,12 +207,42 @@ next-env.d.ts
 `;
 
   await writeFile(path.join(projectPath, '.gitignore'), gitignore);
+}
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+// ============================================
+// SOURCE FILES
+// ============================================
 
-  // Genera store Zustand se richiesto
+async function generateSourceFiles(
+  projectPath: string,
+  config: ProjectConfig,
+  opts: NextOptions
+): Promise<void> {
+  // Zustand store
   if (opts.zustand) {
-    const storeFile = `import { create } from 'zustand';
+    await generateZustandStore(projectPath);
+  }
+
+  // App files
+  await generateAppFiles(projectPath, config.name, opts);
+
+  // Public assets
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <circle cx="18" cy="18" r="16" fill="#0070f3"/>
+  <text x="18" y="24" text-anchor="middle" font-size="18" fill="white">N</text>
+</svg>
+`;
+
+  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
+
+  // GitHub Actions
+  if (opts.githubActions) {
+    await generateNextWorkflow(projectPath, config);
+  }
+}
+
+async function generateZustandStore(projectPath: string): Promise<void> {
+  const storeFile = `import { create } from 'zustand';
 
 interface CounterState {
   count: number;
@@ -186,10 +258,15 @@ export const useCounterStore = create<CounterState>((set) => ({
   reset: () => set({ count: 0 })
 }));
 `;
-    await writeFile(path.join(projectPath, 'src', 'store', 'counterStore.ts'), storeFile);
-  }
+  await writeFile(path.join(projectPath, 'src', 'store', 'counterStore.ts'), storeFile);
+}
 
-  // src/app/globals.css
+async function generateAppFiles(
+  projectPath: string,
+  projectName: string,
+  opts: NextOptions
+): Promise<void> {
+  // globals.css
   let globalsCss: string;
 
   if (opts.tailwind) {
@@ -242,12 +319,12 @@ a:hover {
 
   await writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
 
-  // src/app/layout.tsx
+  // layout.tsx
   const layoutTsx = `import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '${config.name}',
+  title: '${projectName}',
   description: 'Progetto Next.js creato con Create Project CLI',
 };
 
@@ -266,7 +343,7 @@ export default function RootLayout({
 
   await writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layoutTsx);
 
-  // src/app/page.tsx
+  // page.tsx
   let pageTsx: string;
 
   if (opts.zustand) {
@@ -281,9 +358,9 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">${config.name}</h1>
+        <h1 className="text-4xl font-bold mb-4">${projectName}</h1>
         <p className="text-gray-600 mb-8">Il tuo progetto Next.js è pronto!</p>
-        
+
         <div className="bg-white rounded-lg shadow-md p-6">
           <p className="text-2xl font-semibold mb-4">Contatore: {count}</p>
           <div className="flex gap-2 justify-center">
@@ -323,9 +400,9 @@ export default function Home() {
 
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>${config.name}</h1>
+      <h1 className={styles.title}>${projectName}</h1>
       <p className={styles.description}>Il tuo progetto Next.js è pronto!</p>
-      
+
       <div className={styles.card}>
         <p className={styles.count}>Contatore: {count}</p>
         <div className={styles.buttons}>
@@ -345,7 +422,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">${config.name}</h1>
+        <h1 className="text-4xl font-bold mb-4">${projectName}</h1>
         <p className="text-gray-600">Il tuo progetto Next.js è pronto!</p>
       </div>
     </main>
@@ -358,7 +435,7 @@ export default function Home() {
 export default function Home() {
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>${config.name}</h1>
+      <h1 className={styles.title}>${projectName}</h1>
       <p className={styles.description}>Il tuo progetto Next.js è pronto!</p>
     </main>
   );
@@ -369,7 +446,7 @@ export default function Home() {
 
   await writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), pageTsx);
 
-  // src/app/page.module.css (solo se non usa Tailwind)
+  // page.module.css (solo se non usa Tailwind)
   if (!opts.tailwind) {
     const pageModuleCss = `.main {
   display: flex;
@@ -446,23 +523,17 @@ export default function Home() {
 `;
     await writeFile(path.join(projectPath, 'src', 'app', 'page.module.css'), pageModuleCss);
   }
+}
 
-  // public/favicon.svg
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
-  <circle cx="18" cy="18" r="16" fill="#0070f3"/>
-  <text x="18" y="24" text-anchor="middle" font-size="18" fill="white">N</text>
-</svg>
-`;
+// ============================================
+// README
+// ============================================
 
-  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
-
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateNextWorkflow(projectPath, config);
-  }
-
-  logger.step(5, 5, 'Generazione README...');
-
+async function generateReadme(
+  projectPath: string,
+  config: ProjectConfig,
+  opts: NextOptions
+): Promise<void> {
   const features = [
     'Next.js 15',
     'React 19',
