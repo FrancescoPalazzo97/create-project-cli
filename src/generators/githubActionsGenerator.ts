@@ -3,27 +3,27 @@ import { writeFile, createDirectory } from '../utils/fileSystem.js';
 import type { ProjectConfig, PackageManager } from '../types/index.js';
 
 function getPackageManagerCommands(pm: PackageManager): { install: string; run: string } {
-    switch (pm) {
-        case 'yarn':
-            return { install: 'yarn install --frozen-lockfile', run: 'yarn' };
-        case 'pnpm':
-            return { install: 'pnpm install --frozen-lockfile', run: 'pnpm' };
-        default:
-            return { install: 'npm ci', run: 'npm run' };
-    }
+	switch (pm) {
+		case 'yarn':
+			return { install: 'yarn install --frozen-lockfile', run: 'yarn' };
+		case 'pnpm':
+			return { install: 'pnpm install --frozen-lockfile', run: 'pnpm' };
+		default:
+			return { install: 'npm ci', run: 'npm run' };
+	}
 }
 
 // React CI Workflow
 export async function generateReactWorkflow(
-    projectPath: string,
-    config: ProjectConfig
+	projectPath: string,
+	config: ProjectConfig
 ): Promise<void> {
-    const workflowDir = path.join(projectPath, '.github', 'workflows');
-    await createDirectory(workflowDir);
+	const workflowDir = path.join(projectPath, '.github', 'workflows');
+	await createDirectory(workflowDir);
 
-    const { install, run } = getPackageManagerCommands(config.packageManager);
+	const { install, run } = getPackageManagerCommands(config.packageManager);
 
-    const workflow = `name: CI
+	const workflow = `name: CI
 
 on:
   push:
@@ -55,20 +55,20 @@ jobs:
         run: ${run} build
 `;
 
-    await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
+	await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
 }
 
 // Next.js CI Workflow
 export async function generateNextWorkflow(
-    projectPath: string,
-    config: ProjectConfig
+	projectPath: string,
+	config: ProjectConfig
 ): Promise<void> {
-    const workflowDir = path.join(projectPath, '.github', 'workflows');
-    await createDirectory(workflowDir);
+	const workflowDir = path.join(projectPath, '.github', 'workflows');
+	await createDirectory(workflowDir);
 
-    const { install, run } = getPackageManagerCommands(config.packageManager);
+	const { install, run } = getPackageManagerCommands(config.packageManager);
 
-    const workflow = `name: CI
+	const workflow = `name: CI
 
 on:
   push:
@@ -100,20 +100,20 @@ jobs:
         run: ${run} build
 `;
 
-    await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
+	await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
 }
 
 // Astro CI Workflow
 export async function generateAstroWorkflow(
-    projectPath: string,
-    config: ProjectConfig
+	projectPath: string,
+	config: ProjectConfig
 ): Promise<void> {
-    const workflowDir = path.join(projectPath, '.github', 'workflows');
-    await createDirectory(workflowDir);
+	const workflowDir = path.join(projectPath, '.github', 'workflows');
+	await createDirectory(workflowDir);
 
-    const { install, run } = getPackageManagerCommands(config.packageManager);
+	const { install, run } = getPackageManagerCommands(config.packageManager);
 
-    const workflow = `name: CI
+	const workflow = `name: CI
 
 on:
   push:
@@ -142,10 +142,10 @@ jobs:
         run: ${run} build
 `;
 
-    await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
+	await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
 
-    // Deploy to GitHub Pages (opzionale per Astro)
-    const deployWorkflow = `name: Deploy to GitHub Pages
+	// Deploy to GitHub Pages (opzionale per Astro)
+	const deployWorkflow = `name: Deploy to GitHub Pages
 
 on:
   push:
@@ -197,21 +197,21 @@ jobs:
         uses: actions/deploy-pages@v4
 `;
 
-    await writeFile(path.join(workflowDir, 'deploy.yml'), deployWorkflow);
+	await writeFile(path.join(workflowDir, 'deploy.yml'), deployWorkflow);
 }
 
 // Express CI Workflow
 export async function generateExpressWorkflow(
-    projectPath: string,
-    config: ProjectConfig,
-    database: string
+	projectPath: string,
+	config: ProjectConfig,
+	database: string
 ): Promise<void> {
-    const workflowDir = path.join(projectPath, '.github', 'workflows');
-    await createDirectory(workflowDir);
+	const workflowDir = path.join(projectPath, '.github', 'workflows');
+	await createDirectory(workflowDir);
 
-    const { install, run } = getPackageManagerCommands(config.packageManager);
+	const { install, run } = getPackageManagerCommands(config.packageManager);
 
-    let workflow = `name: CI
+	let workflow = `name: CI
 
 on:
   push:
@@ -224,17 +224,17 @@ jobs:
     runs-on: ubuntu-latest
 `;
 
-    // Aggiungi servizi database se necessario
-    if (database === 'mongodb') {
-        workflow += `
+	// Aggiungi servizi database se necessario
+	if (database === 'mongodb') {
+		workflow += `
     services:
       mongodb:
         image: mongo:7
         ports:
           - 27017:27017
 `;
-    } else if (database === 'postgresql') {
-        workflow += `
+	} else if (database === 'postgresql') {
+		workflow += `
     services:
       postgres:
         image: postgres:16-alpine
@@ -250,9 +250,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 `;
-    }
+	}
 
-    workflow += `
+	workflow += `
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -273,15 +273,15 @@ jobs:
         run: ${run} build
 `;
 
-    // Aggiungi step per Prisma se PostgreSQL
-    if (database === 'postgresql') {
-        workflow += `
+	// Aggiungi step per Prisma se PostgreSQL
+	if (database === 'postgresql') {
+		workflow += `
       - name: Generate Prisma Client
         run: ${run} db:generate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test?schema=public
 `;
-    }
+	}
 
-    await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
+	await writeFile(path.join(workflowDir, 'ci.yml'), workflow);
 }

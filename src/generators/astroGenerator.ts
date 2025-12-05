@@ -4,34 +4,38 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig, AstroOptions } from '../types/index.js';
 import { generateAstroWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
-import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
+import {
+	generateReadme as generateReadmeTemplate,
+	commonCommands,
+	projectStructureSections,
+} from '../templates/readme.js';
 
 export async function generateAstroProject(config: ProjectConfig): Promise<void> {
-  const projectPath = path.resolve(config.directory);
-  const opts: AstroOptions = config.astroOptions || {
-    tailwind: false,
-    githubActions: false
-  };
+	const projectPath = path.resolve(config.directory);
+	const opts: AstroOptions = config.astroOptions || {
+		tailwind: false,
+		githubActions: false,
+	};
 
-  logger.step(1, 5, 'Creazione struttura cartelle...');
+	logger.step(1, 5, 'Creazione struttura cartelle...');
 
-  await createDirectoryStructure(projectPath);
+	await createDirectoryStructure(projectPath);
 
-  logger.step(2, 5, 'Generazione package.json...');
+	logger.step(2, 5, 'Generazione package.json...');
 
-  await generatePackageJson(projectPath, config.name, opts);
+	await generatePackageJson(projectPath, config.name, opts);
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+	logger.step(3, 5, 'Generazione file di configurazione...');
 
-  await generateConfigFiles(projectPath, opts);
+	await generateConfigFiles(projectPath, opts);
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+	logger.step(4, 5, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, config, opts);
+	await generateSourceFiles(projectPath, config, opts);
 
-  logger.step(5, 5, 'Generazione README...');
+	logger.step(5, 5, 'Generazione README...');
 
-  await generateReadme(projectPath, config, opts);
+	await generateReadme(projectPath, config, opts);
 }
 
 // ============================================
@@ -39,11 +43,11 @@ export async function generateAstroProject(config: ProjectConfig): Promise<void>
 // ============================================
 
 async function createDirectoryStructure(projectPath: string): Promise<void> {
-  await createDirectory(path.join(projectPath, 'src', 'components'));
-  await createDirectory(path.join(projectPath, 'src', 'layouts'));
-  await createDirectory(path.join(projectPath, 'src', 'pages'));
-  await createDirectory(path.join(projectPath, 'src', 'styles'));
-  await createDirectory(path.join(projectPath, 'public'));
+	await createDirectory(path.join(projectPath, 'src', 'components'));
+	await createDirectory(path.join(projectPath, 'src', 'layouts'));
+	await createDirectory(path.join(projectPath, 'src', 'pages'));
+	await createDirectory(path.join(projectPath, 'src', 'styles'));
+	await createDirectory(path.join(projectPath, 'public'));
 }
 
 // ============================================
@@ -51,74 +55,71 @@ async function createDirectoryStructure(projectPath: string): Promise<void> {
 // ============================================
 
 async function generatePackageJson(
-  projectPath: string,
-  projectName: string,
-  opts: AstroOptions
+	projectPath: string,
+	projectName: string,
+	opts: AstroOptions
 ): Promise<void> {
-  const dependencies: Record<string, string> = {
-    'astro': '^5.7.13'
-  };
+	const dependencies: Record<string, string> = {
+		astro: '^5.7.13',
+	};
 
-  const devDependencies: Record<string, string> = {
-    '@astrojs/check': '^0.9.4',
-    'typescript': '^5.8.3'
-  };
+	const devDependencies: Record<string, string> = {
+		'@astrojs/check': '^0.9.4',
+		typescript: '^5.8.3',
+	};
 
-  if (opts.tailwind) {
-    dependencies['@astrojs/tailwind'] = '^6.0.2';
-    dependencies['tailwindcss'] = '^3.4.17';
-  }
+	if (opts.tailwind) {
+		dependencies['@astrojs/tailwind'] = '^6.0.2';
+		dependencies['tailwindcss'] = '^3.4.17';
+	}
 
-  const packageJson = {
-    name: projectName,
-    type: 'module',
-    version: '0.1.0',
-    scripts: {
-      dev: 'astro dev',
-      build: 'astro build',
-      preview: 'astro preview',
-      astro: 'astro'
-    },
-    dependencies,
-    devDependencies
-  };
+	const packageJson = {
+		name: projectName,
+		type: 'module',
+		version: '0.1.0',
+		scripts: {
+			dev: 'astro dev',
+			build: 'astro build',
+			preview: 'astro preview',
+			astro: 'astro',
+		},
+		dependencies,
+		devDependencies,
+	};
 
-  await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+	await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
 }
 
 // ============================================
 // CONFIG FILES
 // ============================================
 
-async function generateConfigFiles(
-  projectPath: string,
-  opts: AstroOptions
-): Promise<void> {
-  // astro.config.mjs
-  let astroConfig: string;
+async function generateConfigFiles(projectPath: string, opts: AstroOptions): Promise<void> {
+	// astro.config.mjs
+	let astroConfig: string;
 
-  if (opts.tailwind) {
-    astroConfig = `import { defineConfig } from 'astro/config';
+	if (opts.tailwind) {
+		astroConfig = `import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 
 export default defineConfig({
   integrations: [tailwind()],
 });
 `;
-  } else {
-    astroConfig = `import { defineConfig } from 'astro/config';
+	} else {
+		astroConfig = `import { defineConfig } from 'astro/config';
 
 export default defineConfig({
   // La tua configurazione Astro
 });
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'astro.config.mjs'), astroConfig);
+	await writeFile(path.join(projectPath, 'astro.config.mjs'), astroConfig);
 
-  // tailwind.config.mjs (solo se usa Tailwind)
-  if (opts.tailwind) {
-    const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+	// tailwind.config.mjs (solo se usa Tailwind)
+	if (opts.tailwind) {
+		const tailwindConfig = `/** @type {import('tailwindcss').Config} */
 export default {
   content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
   theme: {
@@ -127,26 +128,26 @@ export default {
   plugins: [],
 };
 `;
-    await writeFile(path.join(projectPath, 'tailwind.config.mjs'), tailwindConfig);
-  }
+		await writeFile(path.join(projectPath, 'tailwind.config.mjs'), tailwindConfig);
+	}
 
-  // tsconfig.json
-  const tsconfig = {
-    extends: 'astro/tsconfigs/strict',
-    compilerOptions: {
-      baseUrl: '.',
-      paths: {
-        '@components/*': ['src/components/*'],
-        '@layouts/*': ['src/layouts/*'],
-        '@styles/*': ['src/styles/*']
-      }
-    }
-  };
+	// tsconfig.json
+	const tsconfig = {
+		extends: 'astro/tsconfigs/strict',
+		compilerOptions: {
+			baseUrl: '.',
+			paths: {
+				'@components/*': ['src/components/*'],
+				'@layouts/*': ['src/layouts/*'],
+				'@styles/*': ['src/styles/*'],
+			},
+		},
+	};
 
-  await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+	await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-  // .gitignore
-  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.astro());
+	// .gitignore
+	await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.astro());
 }
 
 // ============================================
@@ -154,51 +155,51 @@ export default {
 // ============================================
 
 async function generateSourceFiles(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: AstroOptions
+	projectPath: string,
+	config: ProjectConfig,
+	opts: AstroOptions
 ): Promise<void> {
-  // Styles
-  await generateStyles(projectPath, config.name, opts);
+	// Styles
+	await generateStyles(projectPath, config.name, opts);
 
-  // Layouts
-  await generateLayouts(projectPath, config.name, opts);
+	// Layouts
+	await generateLayouts(projectPath, config.name, opts);
 
-  // Components
-  await generateComponents(projectPath, config.name, opts);
+	// Components
+	await generateComponents(projectPath, config.name, opts);
 
-  // Pages
-  await generatePages(projectPath, config.name, opts);
+	// Pages
+	await generatePages(projectPath, config.name, opts);
 
-  // Public assets
-  const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+	// Public assets
+	const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
   <circle cx="18" cy="18" r="16" fill="#4f46e5"/>
   <text x="18" y="24" text-anchor="middle" font-size="20" fill="white">A</text>
 </svg>
 `;
 
-  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
+	await writeFile(path.join(projectPath, 'public', 'favicon.svg'), favicon);
 
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateAstroWorkflow(projectPath, config);
-  }
+	// GitHub Actions
+	if (opts.githubActions) {
+		await generateAstroWorkflow(projectPath, config);
+	}
 }
 
 async function generateStyles(
-  projectPath: string,
-  _projectName: string,
-  opts: AstroOptions
+	projectPath: string,
+	_projectName: string,
+	opts: AstroOptions
 ): Promise<void> {
-  let globalCss: string;
+	let globalCss: string;
 
-  if (opts.tailwind) {
-    globalCss = `@tailwind base;
+	if (opts.tailwind) {
+		globalCss = `@tailwind base;
 @tailwind components;
 @tailwind utilities;
 `;
-  } else {
-    globalCss = `:root {
+	} else {
+		globalCss = `:root {
   --color-text: #333;
   --color-background: #fff;
   --color-primary: #4f46e5;
@@ -230,20 +231,20 @@ a:hover {
   text-decoration: underline;
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'styles', 'global.css'), globalCss);
+	await writeFile(path.join(projectPath, 'src', 'styles', 'global.css'), globalCss);
 }
 
 async function generateLayouts(
-  projectPath: string,
-  projectName: string,
-  opts: AstroOptions
+	projectPath: string,
+	projectName: string,
+	opts: AstroOptions
 ): Promise<void> {
-  let baseLayout: string;
+	let baseLayout: string;
 
-  if (opts.tailwind) {
-    baseLayout = `---
+	if (opts.tailwind) {
+		baseLayout = `---
 interface Props {
   title: string;
   description?: string;
@@ -270,8 +271,8 @@ const { title, description = '${projectName} - Sito creato con Astro' } = Astro.
   @import '../styles/global.css';
 </style>
 `;
-  } else {
-    baseLayout = `---
+	} else {
+		baseLayout = `---
 interface Props {
   title: string;
   description?: string;
@@ -298,21 +299,21 @@ const { title, description = '${projectName} - Sito creato con Astro' } = Astro.
   @import '../styles/global.css';
 </style>
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'layouts', 'BaseLayout.astro'), baseLayout);
+	await writeFile(path.join(projectPath, 'src', 'layouts', 'BaseLayout.astro'), baseLayout);
 }
 
 async function generateComponents(
-  projectPath: string,
-  projectName: string,
-  opts: AstroOptions
+	projectPath: string,
+	projectName: string,
+	opts: AstroOptions
 ): Promise<void> {
-  // Header component
-  let headerComponent: string;
+	// Header component
+	let headerComponent: string;
 
-  if (opts.tailwind) {
-    headerComponent = `---
+	if (opts.tailwind) {
+		headerComponent = `---
 interface Props {
   siteName?: string;
 }
@@ -340,8 +341,8 @@ const { siteName = '${projectName}' } = Astro.props;
   </nav>
 </header>
 `;
-  } else {
-    headerComponent = `---
+	} else {
+		headerComponent = `---
 interface Props {
   siteName?: string;
 }
@@ -396,15 +397,15 @@ const { siteName = '${projectName}' } = Astro.props;
   }
 </style>
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'components', 'Header.astro'), headerComponent);
+	await writeFile(path.join(projectPath, 'src', 'components', 'Header.astro'), headerComponent);
 
-  // Footer component
-  let footerComponent: string;
+	// Footer component
+	let footerComponent: string;
 
-  if (opts.tailwind) {
-    footerComponent = `---
+	if (opts.tailwind) {
+		footerComponent = `---
 const year = new Date().getFullYear();
 ---
 
@@ -414,8 +415,8 @@ const year = new Date().getFullYear();
   </p>
 </footer>
 `;
-  } else {
-    footerComponent = `---
+	} else {
+		footerComponent = `---
 const year = new Date().getFullYear();
 ---
 
@@ -437,21 +438,21 @@ const year = new Date().getFullYear();
   }
 </style>
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'components', 'Footer.astro'), footerComponent);
+	await writeFile(path.join(projectPath, 'src', 'components', 'Footer.astro'), footerComponent);
 }
 
 async function generatePages(
-  projectPath: string,
-  projectName: string,
-  opts: AstroOptions
+	projectPath: string,
+	projectName: string,
+	opts: AstroOptions
 ): Promise<void> {
-  // Index page
-  let indexPage: string;
+	// Index page
+	let indexPage: string;
 
-  if (opts.tailwind) {
-    indexPage = `---
+	if (opts.tailwind) {
+		indexPage = `---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -480,8 +481,8 @@ import Footer from '../components/Footer.astro';
   <Footer />
 </BaseLayout>
 `;
-  } else {
-    indexPage = `---
+	} else {
+		indexPage = `---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -540,15 +541,15 @@ import Footer from '../components/Footer.astro';
   }
 </style>
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'pages', 'index.astro'), indexPage);
+	await writeFile(path.join(projectPath, 'src', 'pages', 'index.astro'), indexPage);
 
-  // About page
-  let aboutPage: string;
+	// About page
+	let aboutPage: string;
 
-  if (opts.tailwind) {
-    aboutPage = `---
+	if (opts.tailwind) {
+		aboutPage = `---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -577,8 +578,8 @@ import Footer from '../components/Footer.astro';
   <Footer />
 </BaseLayout>
 `;
-  } else {
-    aboutPage = `---
+	} else {
+		aboutPage = `---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -629,9 +630,9 @@ import Footer from '../components/Footer.astro';
   }
 </style>
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'pages', 'about.astro'), aboutPage);
+	await writeFile(path.join(projectPath, 'src', 'pages', 'about.astro'), aboutPage);
 }
 
 // ============================================
@@ -639,34 +640,32 @@ import Footer from '../components/Footer.astro';
 // ============================================
 
 async function generateReadme(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: AstroOptions
+	projectPath: string,
+	config: ProjectConfig,
+	opts: AstroOptions
 ): Promise<void> {
-  const features = [
-    'Astro 5',
-    'TypeScript',
-    ...(opts.tailwind ? ['Tailwind CSS'] : []),
-    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
-  ];
+	const features = [
+		'Astro 5',
+		'TypeScript',
+		...(opts.tailwind ? ['Tailwind CSS'] : []),
+		...(opts.githubActions ? ['GitHub Actions CI/CD'] : []),
+	];
 
-  const additionalContent = `## Risorse utili
+	const additionalContent = `## Risorse utili
 
 - [Documentazione Astro](https://docs.astro.build)
 - [Astro Components](https://docs.astro.build/en/core-concepts/astro-components/)
 ${opts.tailwind ? '- [Tailwind CSS](https://tailwindcss.com/docs)\n' : ''}- [Astro Integrations](https://astro.build/integrations/)`;
 
-  const readme = generateReadmeTemplate({
-    projectName: config.name,
-    description: 'Sito Astro + TypeScript creato con Create Project CLI.',
-    features,
-    packageManager: config.packageManager,
-    commands: commonCommands.astro(config.packageManager),
-    sections: [
-      projectStructureSections.astro()
-    ],
-    additionalContent
-  });
+	const readme = generateReadmeTemplate({
+		projectName: config.name,
+		description: 'Sito Astro + TypeScript creato con Create Project CLI.',
+		features,
+		packageManager: config.packageManager,
+		commands: commonCommands.astro(config.packageManager),
+		sections: [projectStructureSections.astro()],
+		additionalContent,
+	});
 
-  await writeFile(path.join(projectPath, 'README.md'), readme);
+	await writeFile(path.join(projectPath, 'README.md'), readme);
 }

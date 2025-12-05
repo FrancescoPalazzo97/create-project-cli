@@ -5,54 +5,55 @@ import type { ProjectConfig, NextOptions } from '../types/index.js';
 import { generateNextWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
 import { generateCounterStore } from '../templates/zustand.js';
-import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
+import {
+	generateReadme as generateReadmeTemplate,
+	commonCommands,
+	projectStructureSections,
+} from '../templates/readme.js';
 
 export async function generateNextProject(config: ProjectConfig): Promise<void> {
-  const projectPath = path.resolve(config.directory);
-  const opts: NextOptions = config.nextOptions || {
-    tailwind: false,
-    zustand: false,
-    githubActions: false
-  };
+	const projectPath = path.resolve(config.directory);
+	const opts: NextOptions = config.nextOptions || {
+		tailwind: false,
+		zustand: false,
+		githubActions: false,
+	};
 
-  logger.step(1, 5, 'Creazione struttura cartelle...');
+	logger.step(1, 5, 'Creazione struttura cartelle...');
 
-  await createDirectoryStructure(projectPath, opts);
+	await createDirectoryStructure(projectPath, opts);
 
-  logger.step(2, 5, 'Generazione package.json...');
+	logger.step(2, 5, 'Generazione package.json...');
 
-  await generatePackageJson(projectPath, config.name, opts);
+	await generatePackageJson(projectPath, config.name, opts);
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+	logger.step(3, 5, 'Generazione file di configurazione...');
 
-  await generateConfigFiles(projectPath, opts);
+	await generateConfigFiles(projectPath, opts);
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+	logger.step(4, 5, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, config, opts);
+	await generateSourceFiles(projectPath, config, opts);
 
-  logger.step(5, 5, 'Generazione README...');
+	logger.step(5, 5, 'Generazione README...');
 
-  await generateReadme(projectPath, config, opts);
+	await generateReadme(projectPath, config, opts);
 }
 
 // ============================================
 // DIRECTORY STRUCTURE
 // ============================================
 
-async function createDirectoryStructure(
-  projectPath: string,
-  opts: NextOptions
-): Promise<void> {
-  await createDirectory(path.join(projectPath, 'src', 'app'));
-  await createDirectory(path.join(projectPath, 'src', 'components'));
-  await createDirectory(path.join(projectPath, 'src', 'lib'));
-  await createDirectory(path.join(projectPath, 'src', 'types'));
-  await createDirectory(path.join(projectPath, 'public'));
+async function createDirectoryStructure(projectPath: string, opts: NextOptions): Promise<void> {
+	await createDirectory(path.join(projectPath, 'src', 'app'));
+	await createDirectory(path.join(projectPath, 'src', 'components'));
+	await createDirectory(path.join(projectPath, 'src', 'lib'));
+	await createDirectory(path.join(projectPath, 'src', 'types'));
+	await createDirectory(path.join(projectPath, 'public'));
 
-  if (opts.zustand) {
-    await createDirectory(path.join(projectPath, 'src', 'store'));
-  }
+	if (opts.zustand) {
+		await createDirectory(path.join(projectPath, 'src', 'store'));
+	}
 }
 
 // ============================================
@@ -60,61 +61,58 @@ async function createDirectoryStructure(
 // ============================================
 
 async function generatePackageJson(
-  projectPath: string,
-  projectName: string,
-  opts: NextOptions
+	projectPath: string,
+	projectName: string,
+	opts: NextOptions
 ): Promise<void> {
-  const dependencies: Record<string, string> = {
-    'next': '^15.3.2',
-    'react': '^19.1.0',
-    'react-dom': '^19.1.0'
-  };
+	const dependencies: Record<string, string> = {
+		next: '^15.3.2',
+		react: '^19.1.0',
+		'react-dom': '^19.1.0',
+	};
 
-  const devDependencies: Record<string, string> = {
-    '@types/node': '^22.15.21',
-    '@types/react': '^19.1.2',
-    '@types/react-dom': '^19.1.2',
-    'typescript': '^5.8.3',
-    'eslint': '^9.27.0',
-    'eslint-config-next': '^15.3.2'
-  };
+	const devDependencies: Record<string, string> = {
+		'@types/node': '^22.15.21',
+		'@types/react': '^19.1.2',
+		'@types/react-dom': '^19.1.2',
+		typescript: '^5.8.3',
+		eslint: '^9.27.0',
+		'eslint-config-next': '^15.3.2',
+	};
 
-  if (opts.zustand) {
-    dependencies['zustand'] = '^5.0.4';
-  }
+	if (opts.zustand) {
+		dependencies['zustand'] = '^5.0.4';
+	}
 
-  if (opts.tailwind) {
-    devDependencies['tailwindcss'] = '^4.1.6';
-    devDependencies['@tailwindcss/postcss'] = '^4.1.6';
-  }
+	if (opts.tailwind) {
+		devDependencies['tailwindcss'] = '^4.1.6';
+		devDependencies['@tailwindcss/postcss'] = '^4.1.6';
+	}
 
-  const packageJson = {
-    name: projectName,
-    version: '0.1.0',
-    private: true,
-    scripts: {
-      dev: 'next dev',
-      build: 'next build',
-      start: 'next start',
-      lint: 'next lint'
-    },
-    dependencies,
-    devDependencies
-  };
+	const packageJson = {
+		name: projectName,
+		version: '0.1.0',
+		private: true,
+		scripts: {
+			dev: 'next dev',
+			build: 'next build',
+			start: 'next start',
+			lint: 'next lint',
+		},
+		dependencies,
+		devDependencies,
+	};
 
-  await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+	await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
 }
 
 // ============================================
 // CONFIG FILES
 // ============================================
 
-async function generateConfigFiles(
-  projectPath: string,
-  opts: NextOptions
-): Promise<void> {
-  // next.config.ts
-  const nextConfig = `import type { NextConfig } from 'next';
+async function generateConfigFiles(projectPath: string, opts: NextOptions): Promise<void> {
+	// next.config.ts
+	const nextConfig = `import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // La tua configurazione Next.js
@@ -123,38 +121,38 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 `;
 
-  await writeFile(path.join(projectPath, 'next.config.ts'), nextConfig);
+	await writeFile(path.join(projectPath, 'next.config.ts'), nextConfig);
 
-  // tsconfig.json
-  const tsconfig = {
-    compilerOptions: {
-      target: 'ES2022',
-      lib: ['dom', 'dom.iterable', 'esnext'],
-      allowJs: true,
-      skipLibCheck: true,
-      strict: true,
-      noEmit: true,
-      esModuleInterop: true,
-      module: 'esnext',
-      moduleResolution: 'bundler',
-      resolveJsonModule: true,
-      isolatedModules: true,
-      jsx: 'preserve',
-      incremental: true,
-      plugins: [{ name: 'next' }],
-      paths: {
-        '@/*': ['./src/*']
-      }
-    },
-    include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
-    exclude: ['node_modules']
-  };
+	// tsconfig.json
+	const tsconfig = {
+		compilerOptions: {
+			target: 'ES2022',
+			lib: ['dom', 'dom.iterable', 'esnext'],
+			allowJs: true,
+			skipLibCheck: true,
+			strict: true,
+			noEmit: true,
+			esModuleInterop: true,
+			module: 'esnext',
+			moduleResolution: 'bundler',
+			resolveJsonModule: true,
+			isolatedModules: true,
+			jsx: 'preserve',
+			incremental: true,
+			plugins: [{ name: 'next' }],
+			paths: {
+				'@/*': ['./src/*'],
+			},
+		},
+		include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+		exclude: ['node_modules'],
+	};
 
-  await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+	await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-  // postcss.config.mjs (per Tailwind)
-  if (opts.tailwind) {
-    const postcssConfig = `const config = {
+	// postcss.config.mjs (per Tailwind)
+	if (opts.tailwind) {
+		const postcssConfig = `const config = {
   plugins: {
     "@tailwindcss/postcss": {},
   },
@@ -162,21 +160,21 @@ export default nextConfig;
 
 export default config;
 `;
-    await writeFile(path.join(projectPath, 'postcss.config.mjs'), postcssConfig);
-  }
+		await writeFile(path.join(projectPath, 'postcss.config.mjs'), postcssConfig);
+	}
 
-  // next-env.d.ts
-  const nextEnv = `/// <reference types="next" />
+	// next-env.d.ts
+	const nextEnv = `/// <reference types="next" />
 /// <reference types="next/image-types/global" />
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
 `;
 
-  await writeFile(path.join(projectPath, 'next-env.d.ts'), nextEnv);
+	await writeFile(path.join(projectPath, 'next-env.d.ts'), nextEnv);
 
-  // .gitignore
-  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.next());
+	// .gitignore
+	await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.next());
 }
 
 // ============================================
@@ -184,53 +182,53 @@ export default config;
 // ============================================
 
 async function generateSourceFiles(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: NextOptions
+	projectPath: string,
+	config: ProjectConfig,
+	opts: NextOptions
 ): Promise<void> {
-  // Zustand store
-  if (opts.zustand) {
-    await generateZustandStore(projectPath);
-  }
+	// Zustand store
+	if (opts.zustand) {
+		await generateZustandStore(projectPath);
+	}
 
-  // App files
-  await generateAppFiles(projectPath, config.name, opts);
+	// App files
+	await generateAppFiles(projectPath, config.name, opts);
 
-  // Public assets
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+	// Public assets
+	const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
   <circle cx="18" cy="18" r="16" fill="#0070f3"/>
   <text x="18" y="24" text-anchor="middle" font-size="18" fill="white">N</text>
 </svg>
 `;
 
-  await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
+	await writeFile(path.join(projectPath, 'public', 'favicon.svg'), faviconSvg);
 
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateNextWorkflow(projectPath, config);
-  }
+	// GitHub Actions
+	if (opts.githubActions) {
+		await generateNextWorkflow(projectPath, config);
+	}
 }
 
 async function generateZustandStore(projectPath: string): Promise<void> {
-  await writeFile(
-    path.join(projectPath, 'src', 'store', 'counterStore.ts'),
-    generateCounterStore()
-  );
+	await writeFile(
+		path.join(projectPath, 'src', 'store', 'counterStore.ts'),
+		generateCounterStore()
+	);
 }
 
 async function generateAppFiles(
-  projectPath: string,
-  projectName: string,
-  opts: NextOptions
+	projectPath: string,
+	projectName: string,
+	opts: NextOptions
 ): Promise<void> {
-  // globals.css
-  let globalsCss: string;
+	// globals.css
+	let globalsCss: string;
 
-  if (opts.tailwind) {
-    globalsCss = `@import "tailwindcss";
+	if (opts.tailwind) {
+		globalsCss = `@import "tailwindcss";
 `;
-  } else {
-    globalsCss = `:root {
+	} else {
+		globalsCss = `:root {
   --color-background: #ffffff;
   --color-foreground: #171717;
   --color-primary: #0070f3;
@@ -272,12 +270,12 @@ a:hover {
   text-decoration: underline;
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
+	await writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
 
-  // layout.tsx
-  const layoutTsx = `import type { Metadata } from 'next';
+	// layout.tsx
+	const layoutTsx = `import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -298,14 +296,14 @@ export default function RootLayout({
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layoutTsx);
+	await writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layoutTsx);
 
-  // page.tsx
-  let pageTsx: string;
+	// page.tsx
+	let pageTsx: string;
 
-  if (opts.zustand) {
-    if (opts.tailwind) {
-      pageTsx = `'use client';
+	if (opts.zustand) {
+		if (opts.tailwind) {
+			pageTsx = `'use client';
 
 import { useCounterStore } from '@/store/counterStore';
 
@@ -346,8 +344,8 @@ export default function Home() {
   );
 }
 `;
-    } else {
-      pageTsx = `'use client';
+		} else {
+			pageTsx = `'use client';
 
 import { useCounterStore } from '@/store/counterStore';
 import styles from './page.module.css';
@@ -372,10 +370,10 @@ export default function Home() {
   );
 }
 `;
-    }
-  } else {
-    if (opts.tailwind) {
-      pageTsx = `export default function Home() {
+		}
+	} else {
+		if (opts.tailwind) {
+			pageTsx = `export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
@@ -386,8 +384,8 @@ export default function Home() {
   );
 }
 `;
-    } else {
-      pageTsx = `import styles from './page.module.css';
+		} else {
+			pageTsx = `import styles from './page.module.css';
 
 export default function Home() {
   return (
@@ -398,14 +396,14 @@ export default function Home() {
   );
 }
 `;
-    }
-  }
+		}
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), pageTsx);
+	await writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), pageTsx);
 
-  // page.module.css (solo se non usa Tailwind)
-  if (!opts.tailwind) {
-    const pageModuleCss = `.main {
+	// page.module.css (solo se non usa Tailwind)
+	if (!opts.tailwind) {
+		const pageModuleCss = `.main {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -478,8 +476,8 @@ export default function Home() {
   background-color: #16a34a;
 }
 `;
-    await writeFile(path.join(projectPath, 'src', 'app', 'page.module.css'), pageModuleCss);
-  }
+		await writeFile(path.join(projectPath, 'src', 'app', 'page.module.css'), pageModuleCss);
+	}
 }
 
 // ============================================
@@ -487,30 +485,28 @@ export default function Home() {
 // ============================================
 
 async function generateReadme(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: NextOptions
+	projectPath: string,
+	config: ProjectConfig,
+	opts: NextOptions
 ): Promise<void> {
-  const features = [
-    'Next.js 15',
-    'React 19',
-    'TypeScript',
-    'App Router',
-    ...(opts.tailwind ? ['Tailwind CSS'] : []),
-    ...(opts.zustand ? ['Zustand'] : []),
-    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
-  ];
+	const features = [
+		'Next.js 15',
+		'React 19',
+		'TypeScript',
+		'App Router',
+		...(opts.tailwind ? ['Tailwind CSS'] : []),
+		...(opts.zustand ? ['Zustand'] : []),
+		...(opts.githubActions ? ['GitHub Actions CI/CD'] : []),
+	];
 
-  const readme = generateReadmeTemplate({
-    projectName: config.name,
-    description: 'Progetto Next.js + TypeScript creato con Create Project CLI.',
-    features,
-    packageManager: config.packageManager,
-    commands: commonCommands.next(config.packageManager),
-    sections: [
-      projectStructureSections.next({ zustand: opts.zustand })
-    ]
-  });
+	const readme = generateReadmeTemplate({
+		projectName: config.name,
+		description: 'Progetto Next.js + TypeScript creato con Create Project CLI.',
+		features,
+		packageManager: config.packageManager,
+		commands: commonCommands.next(config.packageManager),
+		sections: [projectStructureSections.next({ zustand: opts.zustand })],
+	});
 
-  await writeFile(path.join(projectPath, 'README.md'), readme);
+	await writeFile(path.join(projectPath, 'README.md'), readme);
 }

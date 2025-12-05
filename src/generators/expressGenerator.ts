@@ -4,56 +4,61 @@ import { logger } from '../utils/logger.js';
 import type { ProjectConfig, ExpressOptions } from '../types/index.js';
 import { generateExpressWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
-import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections, type ReadmeSection } from '../templates/readme.js';
+import {
+	generateReadme as generateReadmeTemplate,
+	commonCommands,
+	projectStructureSections,
+	type ReadmeSection,
+} from '../templates/readme.js';
 
 export async function generateExpressProject(config: ProjectConfig): Promise<void> {
-  const projectPath = path.resolve(config.directory);
-  const opts: ExpressOptions = config.expressOptions || {
-    database: 'none',
-    authentication: false,
-    swagger: false,
-    docker: false,
-    githubActions: false
-  };
+	const projectPath = path.resolve(config.directory);
+	const opts: ExpressOptions = config.expressOptions || {
+		database: 'none',
+		authentication: false,
+		swagger: false,
+		docker: false,
+		githubActions: false,
+	};
 
-  logger.step(1, 6, 'Creazione struttura cartelle...');
+	logger.step(1, 6, 'Creazione struttura cartelle...');
 
-  // Crea le directory
-  await createDirectory(path.join(projectPath, 'src', 'controllers'));
-  await createDirectory(path.join(projectPath, 'src', 'routes'));
-  await createDirectory(path.join(projectPath, 'src', 'middlewares'));
-  await createDirectory(path.join(projectPath, 'src', 'services'));
-  await createDirectory(path.join(projectPath, 'src', 'utils'));
-  await createDirectory(path.join(projectPath, 'src', 'types'));
-  await createDirectory(path.join(projectPath, 'src', 'config'));
+	// Crea le directory
+	await createDirectory(path.join(projectPath, 'src', 'controllers'));
+	await createDirectory(path.join(projectPath, 'src', 'routes'));
+	await createDirectory(path.join(projectPath, 'src', 'middlewares'));
+	await createDirectory(path.join(projectPath, 'src', 'services'));
+	await createDirectory(path.join(projectPath, 'src', 'utils'));
+	await createDirectory(path.join(projectPath, 'src', 'types'));
+	await createDirectory(path.join(projectPath, 'src', 'config'));
 
-  if (opts.database === 'mongodb') {
-    await createDirectory(path.join(projectPath, 'src', 'models'));
-  }
+	if (opts.database === 'mongodb') {
+		await createDirectory(path.join(projectPath, 'src', 'models'));
+	}
 
-  if (opts.database === 'postgresql') {
-    await createDirectory(path.join(projectPath, 'prisma'));
-  }
+	if (opts.database === 'postgresql') {
+		await createDirectory(path.join(projectPath, 'prisma'));
+	}
 
-  logger.step(2, 6, 'Generazione package.json...');
+	logger.step(2, 6, 'Generazione package.json...');
 
-  await generatePackageJson(projectPath, config.name, opts);
+	await generatePackageJson(projectPath, config.name, opts);
 
-  logger.step(3, 6, 'Generazione file di configurazione...');
+	logger.step(3, 6, 'Generazione file di configurazione...');
 
-  await generateConfigFiles(projectPath, config.name, opts);
+	await generateConfigFiles(projectPath, config.name, opts);
 
-  logger.step(4, 6, 'Generazione configurazione database...');
+	logger.step(4, 6, 'Generazione configurazione database...');
 
-  await generateDatabaseConfig(projectPath, opts);
+	await generateDatabaseConfig(projectPath, opts);
 
-  logger.step(5, 6, 'Generazione file sorgente...');
+	logger.step(5, 6, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, config.name, config, opts);
+	await generateSourceFiles(projectPath, config.name, config, opts);
 
-  logger.step(6, 6, 'Generazione README...');
+	logger.step(6, 6, 'Generazione README...');
 
-  await generateReadme(projectPath, config, opts);
+	await generateReadme(projectPath, config, opts);
 }
 
 // ============================================
@@ -61,76 +66,76 @@ export async function generateExpressProject(config: ProjectConfig): Promise<voi
 // ============================================
 
 async function generatePackageJson(
-  projectPath: string,
-  projectName: string,
-  opts: ExpressOptions
+	projectPath: string,
+	projectName: string,
+	opts: ExpressOptions
 ): Promise<void> {
-  const dependencies: Record<string, string> = {
-    'express': '^5.1.0',
-    'cors': '^2.8.5',
-    'helmet': '^8.1.0',
-    'dotenv': '^16.5.0',
-    'zod': '^3.24.4'
-  };
+	const dependencies: Record<string, string> = {
+		express: '^5.1.0',
+		cors: '^2.8.5',
+		helmet: '^8.1.0',
+		dotenv: '^16.5.0',
+		zod: '^3.24.4',
+	};
 
-  const devDependencies: Record<string, string> = {
-    '@types/express': '^5.0.2',
-    '@types/cors': '^2.8.18',
-    '@types/node': '^22.15.21',
-    'typescript': '^5.8.3',
-    'tsx': '^4.19.4',
-    'eslint': '^9.27.0',
-    '@typescript-eslint/eslint-plugin': '^8.32.1',
-    '@typescript-eslint/parser': '^8.32.1'
-  };
+	const devDependencies: Record<string, string> = {
+		'@types/express': '^5.0.2',
+		'@types/cors': '^2.8.18',
+		'@types/node': '^22.15.21',
+		typescript: '^5.8.3',
+		tsx: '^4.19.4',
+		eslint: '^9.27.0',
+		'@typescript-eslint/eslint-plugin': '^8.32.1',
+		'@typescript-eslint/parser': '^8.32.1',
+	};
 
-  const scripts: Record<string, string> = {
-    'dev': 'tsx watch src/server.ts',
-    'build': 'tsc',
-    'start': 'node dist/server.js',
-    'lint': 'eslint src/'
-  };
+	const scripts: Record<string, string> = {
+		dev: 'tsx watch src/server.ts',
+		build: 'tsc',
+		start: 'node dist/server.js',
+		lint: 'eslint src/',
+	};
 
-  // Database dependencies
-  if (opts.database === 'mongodb') {
-    dependencies['mongoose'] = '^8.14.1';
-  }
+	// Database dependencies
+	if (opts.database === 'mongodb') {
+		dependencies['mongoose'] = '^8.14.1';
+	}
 
-  if (opts.database === 'postgresql') {
-    dependencies['@prisma/client'] = '^6.6.0';
-    devDependencies['prisma'] = '^6.6.0';
-    scripts['db:generate'] = 'prisma generate';
-    scripts['db:push'] = 'prisma db push';
-    scripts['db:migrate'] = 'prisma migrate dev';
-    scripts['db:studio'] = 'prisma studio';
-  }
+	if (opts.database === 'postgresql') {
+		dependencies['@prisma/client'] = '^6.6.0';
+		devDependencies['prisma'] = '^6.6.0';
+		scripts['db:generate'] = 'prisma generate';
+		scripts['db:push'] = 'prisma db push';
+		scripts['db:migrate'] = 'prisma migrate dev';
+		scripts['db:studio'] = 'prisma studio';
+	}
 
-  // Authentication dependencies
-  if (opts.authentication) {
-    dependencies['bcrypt'] = '^5.1.1';
-    dependencies['jsonwebtoken'] = '^9.0.2';
-    devDependencies['@types/bcrypt'] = '^5.0.2';
-    devDependencies['@types/jsonwebtoken'] = '^9.0.9';
-  }
+	// Authentication dependencies
+	if (opts.authentication) {
+		dependencies['bcrypt'] = '^5.1.1';
+		dependencies['jsonwebtoken'] = '^9.0.2';
+		devDependencies['@types/bcrypt'] = '^5.0.2';
+		devDependencies['@types/jsonwebtoken'] = '^9.0.9';
+	}
 
-  // Swagger dependencies
-  if (opts.swagger) {
-    dependencies['swagger-ui-express'] = '^5.0.1';
-    dependencies['swagger-jsdoc'] = '^6.2.8';
-    devDependencies['@types/swagger-ui-express'] = '^4.1.8';
-    devDependencies['@types/swagger-jsdoc'] = '^6.0.4';
-  }
+	// Swagger dependencies
+	if (opts.swagger) {
+		dependencies['swagger-ui-express'] = '^5.0.1';
+		dependencies['swagger-jsdoc'] = '^6.2.8';
+		devDependencies['@types/swagger-ui-express'] = '^4.1.8';
+		devDependencies['@types/swagger-jsdoc'] = '^6.0.4';
+	}
 
-  const packageJson = {
-    name: projectName,
-    version: '0.1.0',
-    type: 'module',
-    scripts,
-    dependencies,
-    devDependencies
-  };
+	const packageJson = {
+		name: projectName,
+		version: '0.1.0',
+		type: 'module',
+		scripts,
+		dependencies,
+		devDependencies,
+	};
 
-  await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+	await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
 }
 
 // ============================================
@@ -138,84 +143,84 @@ async function generatePackageJson(
 // ============================================
 
 async function generateConfigFiles(
-  projectPath: string,
-  projectName: string,
-  opts: ExpressOptions
+	projectPath: string,
+	projectName: string,
+	opts: ExpressOptions
 ): Promise<void> {
-  // tsconfig.json
-  const tsconfig = {
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'bundler',
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      outDir: './dist',
-      rootDir: './src',
-      declaration: true,
-      resolveJsonModule: true
-    },
-    include: ['src/**/*'],
-    exclude: ['node_modules', 'dist']
-  };
+	// tsconfig.json
+	const tsconfig = {
+		compilerOptions: {
+			target: 'ES2022',
+			module: 'ESNext',
+			moduleResolution: 'bundler',
+			strict: true,
+			esModuleInterop: true,
+			skipLibCheck: true,
+			outDir: './dist',
+			rootDir: './src',
+			declaration: true,
+			resolveJsonModule: true,
+		},
+		include: ['src/**/*'],
+		exclude: ['node_modules', 'dist'],
+	};
 
-  await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+	await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-  // .env.example e .env
-  let envContent = `# Server
+	// .env.example e .env
+	let envContent = `# Server
 PORT=3000
 NODE_ENV=development
 `;
 
-  if (opts.database === 'mongodb') {
-    envContent += `
+	if (opts.database === 'mongodb') {
+		envContent += `
 # MongoDB
 MONGODB_URI=mongodb://localhost:27017/${projectName}
 `;
-  }
+	}
 
-  if (opts.database === 'postgresql') {
-    envContent += `
+	if (opts.database === 'postgresql') {
+		envContent += `
 # PostgreSQL
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${projectName}?schema=public"
 `;
-  }
+	}
 
-  if (opts.authentication) {
-    envContent += `
+	if (opts.authentication) {
+		envContent += `
 # JWT
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRES_IN=7d
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, '.env.example'), envContent);
-  await writeFile(path.join(projectPath, '.env'), envContent);
+	await writeFile(path.join(projectPath, '.env.example'), envContent);
+	await writeFile(path.join(projectPath, '.env'), envContent);
 
-  // .gitignore
-  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.express());
+	// .gitignore
+	await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.express());
 
-  // Docker Compose
-  if (opts.docker) {
-    await generateDockerCompose(projectPath, projectName, opts.database);
-  }
+	// Docker Compose
+	if (opts.docker) {
+		await generateDockerCompose(projectPath, projectName, opts.database);
+	}
 
-  // Prisma schema
-  if (opts.database === 'postgresql') {
-    await generatePrismaSchema(projectPath, opts.authentication);
-  }
+	// Prisma schema
+	if (opts.database === 'postgresql') {
+		await generatePrismaSchema(projectPath, opts.authentication);
+	}
 }
 
 async function generateDockerCompose(
-  projectPath: string,
-  projectName: string,
-  database: string
+	projectPath: string,
+	projectName: string,
+	database: string
 ): Promise<void> {
-  let dockerCompose: string;
+	let dockerCompose: string;
 
-  if (database === 'mongodb') {
-    dockerCompose = `services:
+	if (database === 'mongodb') {
+		dockerCompose = `services:
   mongodb:
     image: mongo:7
     container_name: ${projectName}-mongodb
@@ -229,8 +234,8 @@ async function generateDockerCompose(
 volumes:
   mongodb_data:
 `;
-  } else {
-    dockerCompose = `services:
+	} else {
+		dockerCompose = `services:
   postgres:
     image: postgres:16-alpine
     container_name: ${projectName}-postgres
@@ -246,16 +251,13 @@ volumes:
 volumes:
   postgres_data:
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
+	await writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
 }
 
-async function generatePrismaSchema(
-  projectPath: string,
-  withAuth: boolean
-): Promise<void> {
-  let prismaSchema = `generator client {
+async function generatePrismaSchema(projectPath: string, withAuth: boolean): Promise<void> {
+	let prismaSchema = `generator client {
   provider = "prisma-client-js"
 }
 
@@ -270,29 +272,26 @@ model User {
   name      String?
 `;
 
-  if (withAuth) {
-    prismaSchema += `  password  String
+	if (withAuth) {
+		prismaSchema += `  password  String
 `;
-  }
+	}
 
-  prismaSchema += `  createdAt DateTime @default(now())
+	prismaSchema += `  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 `;
 
-  await writeFile(path.join(projectPath, 'prisma', 'schema.prisma'), prismaSchema);
+	await writeFile(path.join(projectPath, 'prisma', 'schema.prisma'), prismaSchema);
 }
 
 // ============================================
 // DATABASE CONFIG
 // ============================================
 
-async function generateDatabaseConfig(
-  projectPath: string,
-  opts: ExpressOptions
-): Promise<void> {
-  // src/config/index.ts
-  let configFile = `import dotenv from 'dotenv';
+async function generateDatabaseConfig(projectPath: string, opts: ExpressOptions): Promise<void> {
+	// src/config/index.ts
+	let configFile = `import dotenv from 'dotenv';
 import { z } from 'zod';
 
 dotenv.config();
@@ -302,23 +301,23 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 `;
 
-  if (opts.database === 'mongodb') {
-    configFile += `  MONGODB_URI: z.string().min(1, 'MONGODB_URI è richiesto'),
+	if (opts.database === 'mongodb') {
+		configFile += `  MONGODB_URI: z.string().min(1, 'MONGODB_URI è richiesto'),
 `;
-  }
+	}
 
-  if (opts.database === 'postgresql') {
-    configFile += `  DATABASE_URL: z.string().min(1, 'DATABASE_URL è richiesto'),
+	if (opts.database === 'postgresql') {
+		configFile += `  DATABASE_URL: z.string().min(1, 'DATABASE_URL è richiesto'),
 `;
-  }
+	}
 
-  if (opts.authentication) {
-    configFile += `  JWT_SECRET: z.string().min(1, 'JWT_SECRET è richiesto'),
+	if (opts.authentication) {
+		configFile += `  JWT_SECRET: z.string().min(1, 'JWT_SECRET è richiesto'),
   JWT_EXPIRES_IN: z.string().default('7d'),
 `;
-  }
+	}
 
-  configFile += `});
+	configFile += `});
 
 const parsed = envSchema.safeParse(process.env);
 
@@ -333,30 +332,30 @@ export const config = {
   isDev: parsed.data.NODE_ENV === 'development',
 `;
 
-  if (opts.database === 'mongodb') {
-    configFile += `  mongodbUri: parsed.data.MONGODB_URI,
+	if (opts.database === 'mongodb') {
+		configFile += `  mongodbUri: parsed.data.MONGODB_URI,
 `;
-  }
+	}
 
-  if (opts.database === 'postgresql') {
-    configFile += `  databaseUrl: parsed.data.DATABASE_URL,
+	if (opts.database === 'postgresql') {
+		configFile += `  databaseUrl: parsed.data.DATABASE_URL,
 `;
-  }
+	}
 
-  if (opts.authentication) {
-    configFile += `  jwtSecret: parsed.data.JWT_SECRET,
+	if (opts.authentication) {
+		configFile += `  jwtSecret: parsed.data.JWT_SECRET,
   jwtExpiresIn: parsed.data.JWT_EXPIRES_IN,
 `;
-  }
+	}
 
-  configFile += `};
+	configFile += `};
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'config', 'index.ts'), configFile);
+	await writeFile(path.join(projectPath, 'src', 'config', 'index.ts'), configFile);
 
-  // Database connection file
-  if (opts.database === 'mongodb') {
-    const mongoConnection = `import mongoose from 'mongoose';
+	// Database connection file
+	if (opts.database === 'mongodb') {
+		const mongoConnection = `import mongoose from 'mongoose';
 import { config } from './index.js';
 
 export async function connectDatabase(): Promise<void> {
@@ -375,11 +374,11 @@ export async function disconnectDatabase(): Promise<void> {
 }
 `;
 
-    await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), mongoConnection);
-  }
+		await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), mongoConnection);
+	}
 
-  if (opts.database === 'postgresql') {
-    const prismaClient = `import { PrismaClient } from '@prisma/client';
+	if (opts.database === 'postgresql') {
+		const prismaClient = `import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -407,8 +406,8 @@ export async function disconnectDatabase(): Promise<void> {
 }
 `;
 
-    await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), prismaClient);
-  }
+		await writeFile(path.join(projectPath, 'src', 'config', 'database.ts'), prismaClient);
+	}
 }
 
 // ============================================
@@ -416,11 +415,11 @@ export async function disconnectDatabase(): Promise<void> {
 // ============================================
 
 async function generateSwaggerConfig(
-  projectPath: string,
-  projectName: string,
-  opts: ExpressOptions
+	projectPath: string,
+	projectName: string,
+	opts: ExpressOptions
 ): Promise<void> {
-  const swaggerConfig = `import swaggerJsdoc from 'swagger-jsdoc';
+	const swaggerConfig = `import swaggerJsdoc from 'swagger-jsdoc';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -436,7 +435,9 @@ const options: swaggerJsdoc.Options = {
         description: 'Development server',
       },
     ],
-${opts.authentication ? `    components: {
+${
+	opts.authentication
+		? `    components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
@@ -444,7 +445,9 @@ ${opts.authentication ? `    components: {
           bearerFormat: 'JWT',
         },
       },
-    },` : ''}
+    },`
+		: ''
+}
   },
   apis: ['./src/routes/*.ts'],
 };
@@ -452,7 +455,7 @@ ${opts.authentication ? `    components: {
 export const swaggerSpec = swaggerJsdoc(options);
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'config', 'swagger.ts'), swaggerConfig);
+	await writeFile(path.join(projectPath, 'src', 'config', 'swagger.ts'), swaggerConfig);
 }
 
 // ============================================
@@ -460,47 +463,47 @@ export const swaggerSpec = swaggerJsdoc(options);
 // ============================================
 
 async function generateSourceFiles(
-  projectPath: string,
-  projectName: string,
-  config: ProjectConfig,
-  opts: ExpressOptions
+	projectPath: string,
+	projectName: string,
+	config: ProjectConfig,
+	opts: ExpressOptions
 ): Promise<void> {
-  // Types
-  await generateTypes(projectPath, opts.authentication);
+	// Types
+	await generateTypes(projectPath, opts.authentication);
 
-  // Middlewares
-  await generateMiddlewares(projectPath, opts.authentication);
+	// Middlewares
+	await generateMiddlewares(projectPath, opts.authentication);
 
-  // Models (MongoDB only)
-  if (opts.database === 'mongodb') {
-    await generateMongooseModels(projectPath, opts.authentication);
-  }
+	// Models (MongoDB only)
+	if (opts.database === 'mongodb') {
+		await generateMongooseModels(projectPath, opts.authentication);
+	}
 
-  // Swagger config
-  if (opts.swagger) {
-    await generateSwaggerConfig(projectPath, projectName, opts);
-  }
+	// Swagger config
+	if (opts.swagger) {
+		await generateSwaggerConfig(projectPath, projectName, opts);
+	}
 
-  // Controllers
-  await generateControllers(projectPath, opts);
+	// Controllers
+	await generateControllers(projectPath, opts);
 
-  // Routes
-  await generateRoutes(projectPath, opts);
+	// Routes
+	await generateRoutes(projectPath, opts);
 
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateExpressWorkflow(projectPath, config, opts.database);
-  }
+	// GitHub Actions
+	if (opts.githubActions) {
+		await generateExpressWorkflow(projectPath, config, opts.database);
+	}
 
-  // App
-  await generateApp(projectPath, opts);
+	// App
+	await generateApp(projectPath, opts);
 
-  // Server
-  await generateServer(projectPath, opts);
+	// Server
+	await generateServer(projectPath, opts);
 }
 
 async function generateTypes(projectPath: string, withAuth: boolean): Promise<void> {
-  let typesFile = `import type { Request, Response, NextFunction } from 'express';
+	let typesFile = `import type { Request, Response, NextFunction } from 'express';
 
 export type AsyncHandler = (
   req: Request,
@@ -515,8 +518,8 @@ export interface ApiResponse<T = unknown> {
 }
 `;
 
-  if (withAuth) {
-    typesFile += `
+	if (withAuth) {
+		typesFile += `
 export interface JwtPayload {
   userId: string;
   email: string;
@@ -526,14 +529,14 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'types', 'index.ts'), typesFile);
+	await writeFile(path.join(projectPath, 'src', 'types', 'index.ts'), typesFile);
 }
 
 async function generateMiddlewares(projectPath: string, withAuth: boolean): Promise<void> {
-  // Error handler
-  const errorHandler = `import type { Request, Response, NextFunction } from 'express';
+	// Error handler
+	const errorHandler = `import type { Request, Response, NextFunction } from 'express';
 import { config } from '../config/index.js';
 
 export class AppError extends Error {
@@ -569,10 +572,10 @@ export function errorHandler(
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'middlewares', 'errorHandler.ts'), errorHandler);
+	await writeFile(path.join(projectPath, 'src', 'middlewares', 'errorHandler.ts'), errorHandler);
 
-  // Async handler
-  const asyncHandler = `import type { Request, Response, NextFunction } from 'express';
+	// Async handler
+	const asyncHandler = `import type { Request, Response, NextFunction } from 'express';
 import type { AsyncHandler } from '../types/index.js';
 
 export function asyncHandler(fn: AsyncHandler) {
@@ -582,11 +585,11 @@ export function asyncHandler(fn: AsyncHandler) {
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'middlewares', 'asyncHandler.ts'), asyncHandler);
+	await writeFile(path.join(projectPath, 'src', 'middlewares', 'asyncHandler.ts'), asyncHandler);
 
-  // Auth middleware
-  if (withAuth) {
-    const authMiddleware = `import type { Response, NextFunction } from 'express';
+	// Auth middleware
+	if (withAuth) {
+		const authMiddleware = `import type { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { AppError } from './errorHandler.js';
@@ -615,32 +618,32 @@ export function authenticate(
 }
 `;
 
-    await writeFile(path.join(projectPath, 'src', 'middlewares', 'auth.ts'), authMiddleware);
-  }
+		await writeFile(path.join(projectPath, 'src', 'middlewares', 'auth.ts'), authMiddleware);
+	}
 }
 
 async function generateMongooseModels(projectPath: string, withAuth: boolean): Promise<void> {
-  let userModel = `import mongoose, { Schema, Document } from 'mongoose';
+	let userModel = `import mongoose, { Schema, Document } from 'mongoose';
 `;
 
-  if (withAuth) {
-    userModel += `import bcrypt from 'bcrypt';
+	if (withAuth) {
+		userModel += `import bcrypt from 'bcrypt';
 `;
-  }
+	}
 
-  userModel += `
+	userModel += `
 export interface IUser extends Document {
   email: string;
   name?: string;
 `;
 
-  if (withAuth) {
-    userModel += `  password: string;
+	if (withAuth) {
+		userModel += `  password: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 `;
-  }
+	}
 
-  userModel += `  createdAt: Date;
+	userModel += `  createdAt: Date;
   updatedAt: Date;
 }
 
@@ -658,16 +661,16 @@ const userSchema = new Schema<IUser>(
       trim: true
     }`;
 
-  if (withAuth) {
-    userModel += `,
+	if (withAuth) {
+		userModel += `,
     password: {
       type: String,
       required: true,
       minlength: 6
     }`;
-  }
+	}
 
-  userModel += `
+	userModel += `
   },
   {
     timestamps: true
@@ -675,8 +678,8 @@ const userSchema = new Schema<IUser>(
 );
 `;
 
-  if (withAuth) {
-    userModel += `
+	if (withAuth) {
+		userModel += `
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
@@ -693,25 +696,25 @@ userSchema.methods.comparePassword = async function (
   return bcrypt.compare(candidatePassword, this.password);
 };
 `;
-  }
+	}
 
-  userModel += `
+	userModel += `
 export const User = mongoose.model<IUser>('User', userSchema);
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'models', 'User.ts'), userModel);
+	await writeFile(path.join(projectPath, 'src', 'models', 'User.ts'), userModel);
 
-  // Models index
-  const modelsIndex = `export { User } from './User.js';
+	// Models index
+	const modelsIndex = `export { User } from './User.js';
 export type { IUser } from './User.js';
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'models', 'index.ts'), modelsIndex);
+	await writeFile(path.join(projectPath, 'src', 'models', 'index.ts'), modelsIndex);
 }
 
 async function generateControllers(projectPath: string, opts: ExpressOptions): Promise<void> {
-  // Health controller
-  const healthController = `import type { Request, Response } from 'express';
+	// Health controller
+	const healthController = `import type { Request, Response } from 'express';
 
 export function getHealth(_req: Request, res: Response): void {
   res.json({
@@ -724,24 +727,27 @@ export function getHealth(_req: Request, res: Response): void {
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'controllers', 'healthController.ts'), healthController);
+	await writeFile(
+		path.join(projectPath, 'src', 'controllers', 'healthController.ts'),
+		healthController
+	);
 
-  // Auth controller
-  if (opts.authentication) {
-    await generateAuthController(projectPath, opts.database);
-  }
+	// Auth controller
+	if (opts.authentication) {
+		await generateAuthController(projectPath, opts.database);
+	}
 
-  // User controller
-  if (opts.database !== 'none') {
-    await generateUserController(projectPath, opts);
-  }
+	// User controller
+	if (opts.database !== 'none') {
+		await generateUserController(projectPath, opts);
+	}
 }
 
 async function generateAuthController(projectPath: string, database: string): Promise<void> {
-  let authController: string;
+	let authController: string;
 
-  if (database === 'mongodb') {
-    authController = `import type { Request, Response } from 'express';
+	if (database === 'mongodb') {
+		authController = `import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import { config } from '../config/index.js';
@@ -852,9 +858,9 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
   });
 });
 `;
-  } else {
-    // PostgreSQL / Prisma
-    authController = `import type { Request, Response } from 'express';
+	} else {
+		// PostgreSQL / Prisma
+		authController = `import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { prisma } from '../config/database.js';
@@ -970,16 +976,19 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
   });
 });
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'controllers', 'authController.ts'), authController);
+	await writeFile(
+		path.join(projectPath, 'src', 'controllers', 'authController.ts'),
+		authController
+	);
 }
 
 async function generateUserController(projectPath: string, opts: ExpressOptions): Promise<void> {
-  let userController: string;
+	let userController: string;
 
-  if (opts.database === 'mongodb') {
-    userController = `import type { Request, Response } from 'express';
+	if (opts.database === 'mongodb') {
+		userController = `import type { Request, Response } from 'express';
 import { User } from '../models/index.js';
 import { asyncHandler } from '../middlewares/asyncHandler.js';
 import { AppError } from '../middlewares/errorHandler.js';
@@ -1021,8 +1030,8 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 `;
-  } else {
-    userController = `import type { Request, Response } from 'express';
+	} else {
+		userController = `import type { Request, Response } from 'express';
 import { prisma } from '../config/database.js';
 import { asyncHandler } from '../middlewares/asyncHandler.js';
 import { AppError } from '../middlewares/errorHandler.js';
@@ -1070,22 +1079,25 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   }
 });
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'controllers', 'userController.ts'), userController);
+	await writeFile(
+		path.join(projectPath, 'src', 'controllers', 'userController.ts'),
+		userController
+	);
 }
 
 async function generateRoutes(projectPath: string, opts: ExpressOptions): Promise<void> {
-  // Health routes
-  let healthRoutes = `import { Router } from 'express';
+	// Health routes
+	let healthRoutes = `import { Router } from 'express';
 import { getHealth } from '../controllers/healthController.js';
 
 const router = Router();
 
 `;
 
-  if (opts.swagger) {
-    healthRoutes += `/**
+	if (opts.swagger) {
+		healthRoutes += `/**
  * @swagger
  * /api/health:
  *   get:
@@ -1110,18 +1122,18 @@ const router = Router();
  *                       type: string
  */
 `;
-  }
+	}
 
-  healthRoutes += `router.get('/', getHealth);
+	healthRoutes += `router.get('/', getHealth);
 
 export default router;
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'routes', 'healthRoutes.ts'), healthRoutes);
+	await writeFile(path.join(projectPath, 'src', 'routes', 'healthRoutes.ts'), healthRoutes);
 
-  // Auth routes
-  if (opts.authentication) {
-    let authRoutes = `import { Router } from 'express';
+	// Auth routes
+	if (opts.authentication) {
+		let authRoutes = `import { Router } from 'express';
 import { register, login, getMe } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
@@ -1129,8 +1141,8 @@ const router = Router();
 
 `;
 
-    if (opts.swagger) {
-      authRoutes += `/**
+		if (opts.swagger) {
+			authRoutes += `/**
  * @swagger
  * components:
  *   schemas:
@@ -1255,50 +1267,54 @@ router.get('/me', authenticate, getMe);
 
 export default router;
 `;
-    } else {
-      authRoutes += `router.post('/register', register);
+		} else {
+			authRoutes += `router.post('/register', register);
 router.post('/login', login);
 router.get('/me', authenticate, getMe);
 
 export default router;
 `;
-    }
+		}
 
-    await writeFile(path.join(projectPath, 'src', 'routes', 'authRoutes.ts'), authRoutes);
-  }
+		await writeFile(path.join(projectPath, 'src', 'routes', 'authRoutes.ts'), authRoutes);
+	}
 
-  // User routes
-  if (opts.database !== 'none') {
-    let userRoutes = `import { Router } from 'express';
+	// User routes
+	if (opts.database !== 'none') {
+		let userRoutes = `import { Router } from 'express';
 import { getUsers, getUserById, deleteUser } from '../controllers/userController.js';
 `;
 
-    if (opts.authentication) {
-      userRoutes += `import { authenticate } from '../middlewares/auth.js';
+		if (opts.authentication) {
+			userRoutes += `import { authenticate } from '../middlewares/auth.js';
 `;
-    }
+		}
 
-    userRoutes += `
+		userRoutes += `
 const router = Router();
 
 `;
 
-    if (opts.authentication) {
-      userRoutes += `// Tutte le route richiedono autenticazione
+		if (opts.authentication) {
+			userRoutes += `// Tutte le route richiedono autenticazione
 router.use(authenticate);
 
 `;
-    }
+		}
 
-    if (opts.swagger) {
-      userRoutes += `/**
+		if (opts.swagger) {
+			userRoutes += `/**
  * @swagger
  * /api/users:
  *   get:
  *     summary: Ottieni lista utenti
  *     tags: [Users]
-${opts.authentication ? `*     security:
- *       - bearerAuth: []` : ''}
+${
+	opts.authentication
+		? `*     security:
+ *       - bearerAuth: []`
+		: ''
+}
  *     responses:
  *       200:
  *         description: Lista degli utenti
@@ -1322,8 +1338,12 @@ router.get('/', getUsers);
  *   get:
  *     summary: Ottieni utente per ID
  *     tags: [Users]
-${opts.authentication ? `*     security:
- *       - bearerAuth: []` : ''}
+${
+	opts.authentication
+		? `*     security:
+ *       - bearerAuth: []`
+		: ''
+}
  *     parameters:
  *       - in: path
  *         name: id
@@ -1354,8 +1374,12 @@ router.get('/:id', getUserById);
  *   delete:
  *     summary: Elimina utente
  *     tags: [Users]
-${opts.authentication ? `*     security:
- *       - bearerAuth: []` : ''}
+${
+	opts.authentication
+		? `*     security:
+ *       - bearerAuth: []`
+		: ''
+}
  *     parameters:
  *       - in: path
  *         name: id
@@ -1373,69 +1397,69 @@ router.delete('/:id', deleteUser);
 
 export default router;
 `;
-    } else {
-      userRoutes += `router.get('/', getUsers);
+		} else {
+			userRoutes += `router.get('/', getUsers);
 router.get('/:id', getUserById);
 router.delete('/:id', deleteUser);
 
 export default router;
 `;
-    }
+		}
 
-    await writeFile(path.join(projectPath, 'src', 'routes', 'userRoutes.ts'), userRoutes);
-  }
+		await writeFile(path.join(projectPath, 'src', 'routes', 'userRoutes.ts'), userRoutes);
+	}
 
-  // Routes index
-  let routesIndex = `import { Router } from 'express';
+	// Routes index
+	let routesIndex = `import { Router } from 'express';
 import healthRoutes from './healthRoutes.js';
 `;
 
-  if (opts.authentication) {
-    routesIndex += `import authRoutes from './authRoutes.js';
+	if (opts.authentication) {
+		routesIndex += `import authRoutes from './authRoutes.js';
 `;
-  }
+	}
 
-  if (opts.database !== 'none') {
-    routesIndex += `import userRoutes from './userRoutes.js';
+	if (opts.database !== 'none') {
+		routesIndex += `import userRoutes from './userRoutes.js';
 `;
-  }
+	}
 
-  routesIndex += `
+	routesIndex += `
 const router = Router();
 
 router.use('/health', healthRoutes);
 `;
 
-  if (opts.authentication) {
-    routesIndex += `router.use('/auth', authRoutes);
+	if (opts.authentication) {
+		routesIndex += `router.use('/auth', authRoutes);
 `;
-  }
+	}
 
-  if (opts.database !== 'none') {
-    routesIndex += `router.use('/users', userRoutes);
+	if (opts.database !== 'none') {
+		routesIndex += `router.use('/users', userRoutes);
 `;
-  }
+	}
 
-  routesIndex += `
+	routesIndex += `
 export default router;
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'routes', 'index.ts'), routesIndex);
+	await writeFile(path.join(projectPath, 'src', 'routes', 'index.ts'), routesIndex);
 }
 
 async function generateApp(projectPath: string, opts: ExpressOptions): Promise<void> {
-  let appFile = `import express from 'express';
+	let appFile = `import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 `;
 
-  if (opts.swagger) {
-    appFile += `import swaggerUi from 'swagger-ui-express';
+	if (opts.swagger) {
+		appFile += `import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
 `;
-  }
+	}
 
-  appFile += `import routes from './routes/index.js';
+	appFile += `import routes from './routes/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
@@ -1449,14 +1473,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 `;
 
-  if (opts.swagger) {
-    appFile += `
+	if (opts.swagger) {
+		appFile += `
 // Swagger documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 `;
-  }
+	}
 
-  appFile += `
+	appFile += `
 // Routes
 app.use('/api', routes);
 
@@ -1466,14 +1490,14 @@ app.use(errorHandler);
 export default app;
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'app.ts'), appFile);
+	await writeFile(path.join(projectPath, 'src', 'app.ts'), appFile);
 }
 
 async function generateServer(projectPath: string, opts: ExpressOptions): Promise<void> {
-  let serverFile: string;
+	let serverFile: string;
 
-  if (opts.database === 'none') {
-    serverFile = `import app from './app.js';
+	if (opts.database === 'none') {
+		serverFile = `import app from './app.js';
 import { config } from './config/index.js';
 
 app.listen(config.port, () => {
@@ -1482,8 +1506,8 @@ app.listen(config.port, () => {
 ${opts.swagger ? `  console.log(\`📚 Swagger docs: http://localhost:\${config.port}/api/docs\`);` : ''}
 });
 `;
-  } else {
-    serverFile = `import app from './app.js';
+	} else {
+		serverFile = `import app from './app.js';
 import { config } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 
@@ -1501,9 +1525,9 @@ ${opts.swagger ? `    console.log(\`📚 Swagger docs: http://localhost:\${confi
 
 bootstrap().catch(console.error);
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'server.ts'), serverFile);
+	await writeFile(path.join(projectPath, 'src', 'server.ts'), serverFile);
 }
 
 // ============================================
@@ -1511,104 +1535,101 @@ bootstrap().catch(console.error);
 // ============================================
 
 async function generateReadme(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: ExpressOptions
+	projectPath: string,
+	config: ProjectConfig,
+	opts: ExpressOptions
 ): Promise<void> {
-  const features = [
-    'Express.js 5',
-    'TypeScript',
-    'Zod (validazione)',
-    'Helmet + CORS (sicurezza)'
-  ];
+	const features = ['Express.js 5', 'TypeScript', 'Zod (validazione)', 'Helmet + CORS (sicurezza)'];
 
-  if (opts.database === 'mongodb') features.push('MongoDB + Mongoose');
-  if (opts.database === 'postgresql') features.push('PostgreSQL + Prisma');
-  if (opts.authentication) features.push('Autenticazione JWT');
-  if (opts.docker) features.push('Docker Compose');
-  if (opts.swagger) features.push('Swagger/OpenAPI');
-  if (opts.githubActions) features.push('GitHub Actions CI/CD');
+	if (opts.database === 'mongodb') features.push('MongoDB + Mongoose');
+	if (opts.database === 'postgresql') features.push('PostgreSQL + Prisma');
+	if (opts.authentication) features.push('Autenticazione JWT');
+	if (opts.docker) features.push('Docker Compose');
+	if (opts.swagger) features.push('Swagger/OpenAPI');
+	if (opts.githubActions) features.push('GitHub Actions CI/CD');
 
-  // Costruisce le sezioni custom
-  const sections: ReadmeSection[] = [];
+	// Costruisce le sezioni custom
+	const sections: ReadmeSection[] = [];
 
-  // Sezione struttura del progetto
-  sections.push(projectStructureSections.express({
-    database: opts.database !== 'none',
-    auth: opts.authentication
-  }));
+	// Sezione struttura del progetto
+	sections.push(
+		projectStructureSections.express({
+			database: opts.database !== 'none',
+			auth: opts.authentication,
+		})
+	);
 
-  // Sezione Setup
-  let setupContent = `\`\`\`bash
+	// Sezione Setup
+	let setupContent = `\`\`\`bash
 # Installa le dipendenze
 ${config.packageManager} install
 `;
 
-  if (opts.docker) {
-    setupContent += `
+	if (opts.docker) {
+		setupContent += `
 # Avvia il database con Docker
 docker-compose up -d
 `;
-  }
+	}
 
-  if (opts.database === 'postgresql') {
-    setupContent += `
+	if (opts.database === 'postgresql') {
+		setupContent += `
 # Genera il client Prisma
 ${config.packageManager} run db:generate
 
 # Push dello schema
 ${config.packageManager} run db:push
 `;
-  }
+	}
 
-  setupContent += `
+	setupContent += `
 # Avvia il server
 ${config.packageManager} run dev
 \`\`\``;
 
-  sections.push({ title: 'Setup', content: setupContent });
+	sections.push({ title: 'Setup', content: setupContent });
 
-  // Sezione API Endpoints
-  let endpointsContent = `### Health
+	// Sezione API Endpoints
+	let endpointsContent = `### Health
 - \`GET /api/health\` - Health check
 `;
 
-  if (opts.authentication) {
-    endpointsContent += `
+	if (opts.authentication) {
+		endpointsContent += `
 ### Autenticazione
 - \`POST /api/auth/register\` - Registrazione
 - \`POST /api/auth/login\` - Login
 - \`GET /api/auth/me\` - Profilo utente (richiede token)
 `;
-  }
+	}
 
-  if (opts.database !== 'none') {
-    endpointsContent += `
+	if (opts.database !== 'none') {
+		endpointsContent += `
 ### Utenti${opts.authentication ? ' (richiede token)' : ''}
 - \`GET /api/users\` - Lista utenti
 - \`GET /api/users/:id\` - Dettaglio utente
 - \`DELETE /api/users/:id\` - Elimina utente
 `;
-  }
+	}
 
-  sections.push({ title: 'API Endpoints', content: endpointsContent });
+	sections.push({ title: 'API Endpoints', content: endpointsContent });
 
-  // Sezione Documentazione API (se Swagger)
-  if (opts.swagger) {
-    sections.push({
-      title: 'Documentazione API',
-      content: `La documentazione interattiva delle API è disponibile su:
+	// Sezione Documentazione API (se Swagger)
+	if (opts.swagger) {
+		sections.push({
+			title: 'Documentazione API',
+			content: `La documentazione interattiva delle API è disponibile su:
 \`\`\`
 http://localhost:3000/api/docs
-\`\`\``
-    });
-  }
+\`\`\``,
+		});
+	}
 
-  // Sezione Autenticazione (se JWT)
-  if (opts.authentication) {
-    sections.push({
-      title: 'Autenticazione',
-      content: `### Registrazione
+	// Sezione Autenticazione (se JWT)
+	if (opts.authentication) {
+		sections.push({
+			title: 'Autenticazione',
+			content: `### Registrazione
 \`\`\`bash
 curl -X POST http://localhost:3000/api/auth/register \\
   -H "Content-Type: application/json" \\
@@ -1626,18 +1647,18 @@ curl -X POST http://localhost:3000/api/auth/login \\
 \`\`\`bash
 curl http://localhost:3000/api/auth/me \\
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
-\`\`\``
-    });
-  }
+\`\`\``,
+		});
+	}
 
-  const readme = generateReadmeTemplate({
-    projectName: config.name,
-    description: 'API Express.js + TypeScript creata con Create Project CLI.',
-    features,
-    packageManager: config.packageManager,
-    commands: commonCommands.express(config.packageManager, opts.database === 'postgresql'),
-    sections
-  });
+	const readme = generateReadmeTemplate({
+		projectName: config.name,
+		description: 'API Express.js + TypeScript creata con Create Project CLI.',
+		features,
+		packageManager: config.packageManager,
+		commands: commonCommands.express(config.packageManager, opts.database === 'postgresql'),
+		sections,
+	});
 
-  await writeFile(path.join(projectPath, 'README.md'), readme);
+	await writeFile(path.join(projectPath, 'README.md'), readme);
 }

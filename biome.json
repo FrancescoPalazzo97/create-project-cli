@@ -1,0 +1,111 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineEnding": "lf",
+		"lineWidth": 100
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"correctness": {
+				"noUnusedVariables": "warn",
+				"noUnusedImports": "warn",
+				"noUnreachable": "error",
+				"noConstAssign": "error",
+				"useValidForDirection": "error"
+			},
+			"style": {
+				"useConst": "error",
+				"noNonNullAssertion": "warn",
+				"useTemplate": "warn",
+				"useNodejsImportProtocol": "error",
+				"useExportType": "error",
+				"useImportType": "error"
+			},
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noDoubleEquals": "error",
+				"noDebugger": "error",
+				"noAsyncPromiseExecutor": "error",
+				"noCatchAssign": "error",
+				"noMisleadingCharacterClass": "error"
+			},
+			"complexity": {
+				"noForEach": "off",
+				"useFlatMap": "warn",
+				"useOptionalChain": "warn"
+			},
+			"performance": {
+				"noAccumulatingSpread": "warn"
+			},
+			"security": {
+				"noDangerouslySetInnerHtml": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"jsxQuoteStyle": "double",
+			"trailingCommas": "es5",
+			"semicolons": "always",
+			"arrowParentheses": "always",
+			"bracketSpacing": true,
+			"bracketSameLine": false,
+			"quoteProperties": "asNeeded",
+			"attributePosition": "auto"
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		},
+		{
+			"linter": {
+				"rules": {
+					"style": {
+						"useNodejsImportProtocol": "off"
+					}
+				}
+			}
+		},
+		{
+			"linter": {
+				"rules": {
+					"style": {
+						"useNodejsImportProtocol": {
+							"level": "off"
+						}
+					}
+				}
+			}
+		}
+	]
+}

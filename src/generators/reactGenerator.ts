@@ -5,36 +5,40 @@ import type { ProjectConfig } from '../types/index.js';
 import { generateReactWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
 import { generateCounterStore } from '../templates/zustand.js';
-import { generateReadme as generateReadmeTemplate, commonCommands, projectStructureSections } from '../templates/readme.js';
+import {
+	generateReadme as generateReadmeTemplate,
+	commonCommands,
+	projectStructureSections,
+} from '../templates/readme.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
-  const projectPath = path.resolve(config.directory);
-  const opts = config.reactOptions || {
-    tailwind: false,
-    reactRouter: false,
-    zustand: false,
-    githubActions: false
-  };
+	const projectPath = path.resolve(config.directory);
+	const opts = config.reactOptions || {
+		tailwind: false,
+		reactRouter: false,
+		zustand: false,
+		githubActions: false,
+	};
 
-  logger.step(1, 5, 'Creazione struttura cartelle...');
+	logger.step(1, 5, 'Creazione struttura cartelle...');
 
-  await createDirectoryStructure(projectPath, opts);
+	await createDirectoryStructure(projectPath, opts);
 
-  logger.step(2, 5, 'Generazione package.json...');
+	logger.step(2, 5, 'Generazione package.json...');
 
-  await generatePackageJson(projectPath, config.name, opts);
+	await generatePackageJson(projectPath, config.name, opts);
 
-  logger.step(3, 5, 'Generazione file di configurazione...');
+	logger.step(3, 5, 'Generazione file di configurazione...');
 
-  await generateConfigFiles(projectPath, config.name, opts);
+	await generateConfigFiles(projectPath, config.name, opts);
 
-  logger.step(4, 5, 'Generazione file sorgente...');
+	logger.step(4, 5, 'Generazione file sorgente...');
 
-  await generateSourceFiles(projectPath, config.name, config, opts);
+	await generateSourceFiles(projectPath, config.name, config, opts);
 
-  logger.step(5, 5, 'Generazione README...');
+	logger.step(5, 5, 'Generazione README...');
 
-  await generateReadme(projectPath, config, opts);
+	await generateReadme(projectPath, config, opts);
 }
 
 // ============================================
@@ -42,22 +46,22 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
 // ============================================
 
 async function createDirectoryStructure(
-  projectPath: string,
-  opts: { reactRouter: boolean; zustand: boolean }
+	projectPath: string,
+	opts: { reactRouter: boolean; zustand: boolean }
 ): Promise<void> {
-  await createDirectory(path.join(projectPath, 'src', 'components'));
-  await createDirectory(path.join(projectPath, 'src', 'hooks'));
-  await createDirectory(path.join(projectPath, 'src', 'utils'));
-  await createDirectory(path.join(projectPath, 'src', 'types'));
-  await createDirectory(path.join(projectPath, 'public'));
+	await createDirectory(path.join(projectPath, 'src', 'components'));
+	await createDirectory(path.join(projectPath, 'src', 'hooks'));
+	await createDirectory(path.join(projectPath, 'src', 'utils'));
+	await createDirectory(path.join(projectPath, 'src', 'types'));
+	await createDirectory(path.join(projectPath, 'public'));
 
-  if (opts.reactRouter) {
-    await createDirectory(path.join(projectPath, 'src', 'pages'));
-  }
+	if (opts.reactRouter) {
+		await createDirectory(path.join(projectPath, 'src', 'pages'));
+	}
 
-  if (opts.zustand) {
-    await createDirectory(path.join(projectPath, 'src', 'store'));
-  }
+	if (opts.zustand) {
+		await createDirectory(path.join(projectPath, 'src', 'store'));
+	}
 }
 
 // ============================================
@@ -65,58 +69,58 @@ async function createDirectoryStructure(
 // ============================================
 
 async function generatePackageJson(
-  projectPath: string,
-  projectName: string,
-  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean }
+	projectPath: string,
+	projectName: string,
+	opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean }
 ): Promise<void> {
-  const dependencies: Record<string, string> = {
-    'react': '^19.1.0',
-    'react-dom': '^19.1.0'
-  };
+	const dependencies: Record<string, string> = {
+		react: '^19.1.0',
+		'react-dom': '^19.1.0',
+	};
 
-  const devDependencies: Record<string, string> = {
-    '@eslint/js': '^9.25.0',
-    '@types/react': '^19.1.2',
-    '@types/react-dom': '^19.1.2',
-    '@vitejs/plugin-react': '^4.4.1',
-    'eslint': '^9.25.0',
-    'eslint-plugin-react-hooks': '^5.2.0',
-    'eslint-plugin-react-refresh': '^0.4.19',
-    'globals': '^16.0.0',
-    'typescript': '~5.8.3',
-    'typescript-eslint': '^8.30.1',
-    'vite': '^6.3.5'
-  };
+	const devDependencies: Record<string, string> = {
+		'@eslint/js': '^9.25.0',
+		'@types/react': '^19.1.2',
+		'@types/react-dom': '^19.1.2',
+		'@vitejs/plugin-react': '^4.4.1',
+		eslint: '^9.25.0',
+		'eslint-plugin-react-hooks': '^5.2.0',
+		'eslint-plugin-react-refresh': '^0.4.19',
+		globals: '^16.0.0',
+		typescript: '~5.8.3',
+		'typescript-eslint': '^8.30.1',
+		vite: '^6.3.5',
+	};
 
-  if (opts.reactRouter) {
-    dependencies['react-router-dom'] = '^7.6.0';
-  }
+	if (opts.reactRouter) {
+		dependencies['react-router-dom'] = '^7.6.0';
+	}
 
-  if (opts.zustand) {
-    dependencies['zustand'] = '^5.0.4';
-  }
+	if (opts.zustand) {
+		dependencies['zustand'] = '^5.0.4';
+	}
 
-  if (opts.tailwind) {
-    devDependencies['tailwindcss'] = '^4.1.6';
-    devDependencies['@tailwindcss/vite'] = '^4.1.6';
-  }
+	if (opts.tailwind) {
+		devDependencies['tailwindcss'] = '^4.1.6';
+		devDependencies['@tailwindcss/vite'] = '^4.1.6';
+	}
 
-  const packageJson = {
-    name: projectName,
-    private: true,
-    version: '0.1.0',
-    type: 'module',
-    scripts: {
-      dev: 'vite',
-      build: 'tsc -b && vite build',
-      lint: 'eslint .',
-      preview: 'vite preview'
-    },
-    dependencies,
-    devDependencies
-  };
+	const packageJson = {
+		name: projectName,
+		private: true,
+		version: '0.1.0',
+		type: 'module',
+		scripts: {
+			dev: 'vite',
+			build: 'tsc -b && vite build',
+			lint: 'eslint .',
+			preview: 'vite preview',
+		},
+		dependencies,
+		devDependencies,
+	};
 
-  await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
+	await writeJsonFile(path.join(projectPath, 'package.json'), packageJson);
 }
 
 // ============================================
@@ -124,40 +128,40 @@ async function generatePackageJson(
 // ============================================
 
 async function generateConfigFiles(
-  projectPath: string,
-  projectName: string,
-  opts: { tailwind: boolean }
+	projectPath: string,
+	projectName: string,
+	opts: { tailwind: boolean }
 ): Promise<void> {
-  // tsconfig.json
-  const tsconfig = {
-    compilerOptions: {
-      target: 'ES2022',
-      useDefineForClassFields: true,
-      lib: ['ES2022', 'DOM', 'DOM.Iterable'],
-      module: 'ESNext',
-      skipLibCheck: true,
-      moduleResolution: 'bundler',
-      allowImportingTsExtensions: true,
-      isolatedModules: true,
-      moduleDetection: 'force',
-      noEmit: true,
-      jsx: 'react-jsx',
-      strict: true,
-      noUnusedLocals: true,
-      noUnusedParameters: true,
-      noFallthroughCasesInSwitch: true,
-      noUncheckedSideEffectImports: true
-    },
-    include: ['src']
-  };
+	// tsconfig.json
+	const tsconfig = {
+		compilerOptions: {
+			target: 'ES2022',
+			useDefineForClassFields: true,
+			lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+			module: 'ESNext',
+			skipLibCheck: true,
+			moduleResolution: 'bundler',
+			allowImportingTsExtensions: true,
+			isolatedModules: true,
+			moduleDetection: 'force',
+			noEmit: true,
+			jsx: 'react-jsx',
+			strict: true,
+			noUnusedLocals: true,
+			noUnusedParameters: true,
+			noFallthroughCasesInSwitch: true,
+			noUncheckedSideEffectImports: true,
+		},
+		include: ['src'],
+	};
 
-  await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
+	await writeJsonFile(path.join(projectPath, 'tsconfig.json'), tsconfig);
 
-  // vite.config.ts
-  let viteConfig: string;
+	// vite.config.ts
+	let viteConfig: string;
 
-  if (opts.tailwind) {
-    viteConfig = `import { defineConfig } from 'vite';
+	if (opts.tailwind) {
+		viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -165,23 +169,23 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
 });
 `;
-  } else {
-    viteConfig = `import { defineConfig } from 'vite';
+	} else {
+		viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
 });
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'vite.config.ts'), viteConfig);
+	await writeFile(path.join(projectPath, 'vite.config.ts'), viteConfig);
 
-  // .gitignore
-  await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.react());
+	// .gitignore
+	await writeFile(path.join(projectPath, '.gitignore'), gitignorePresets.react());
 
-  // vite-env.d.ts
-  const viteEnv = `/// <reference types="vite/client" />
+	// vite-env.d.ts
+	const viteEnv = `/// <reference types="vite/client" />
 
 declare module '*.css' {
   const content: string;
@@ -214,7 +218,7 @@ declare module '*.jpg' {
 }
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'vite-env.d.ts'), viteEnv);
+	await writeFile(path.join(projectPath, 'src', 'vite-env.d.ts'), viteEnv);
 }
 
 // ============================================
@@ -222,13 +226,13 @@ declare module '*.jpg' {
 // ============================================
 
 async function generateSourceFiles(
-  projectPath: string,
-  projectName: string,
-  config: ProjectConfig,
-  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
+	projectPath: string,
+	projectName: string,
+	config: ProjectConfig,
+	opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
 ): Promise<void> {
-  // index.html
-  const indexHtml = `<!DOCTYPE html>
+	// index.html
+	const indexHtml = `<!DOCTYPE html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
@@ -243,36 +247,36 @@ async function generateSourceFiles(
 </html>
 `;
 
-  await writeFile(path.join(projectPath, 'index.html'), indexHtml);
+	await writeFile(path.join(projectPath, 'index.html'), indexHtml);
 
-  // Zustand store
-  if (opts.zustand) {
-    await generateZustandStore(projectPath);
-  }
+	// Zustand store
+	if (opts.zustand) {
+		await generateZustandStore(projectPath);
+	}
 
-  // React Router o file base
-  if (opts.reactRouter) {
-    await generateReactRouterFiles(projectPath, projectName, opts);
-  } else {
-    await generateBasicFiles(projectPath, projectName, opts);
-  }
+	// React Router o file base
+	if (opts.reactRouter) {
+		await generateReactRouterFiles(projectPath, projectName, opts);
+	} else {
+		await generateBasicFiles(projectPath, projectName, opts);
+	}
 
-  // CSS
-  await generateStyles(projectPath, opts.tailwind);
+	// CSS
+	await generateStyles(projectPath, opts.tailwind);
 
-  // public/vite.svg
-  const viteSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 257">
+	// public/vite.svg
+	const viteSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 257">
   <path fill="#646CFF" d="m128 0 128 44.5-20.8 171.2L128 257 21.2 215.7.4 44.5z"/>
   <path fill="#fff" d="M96 160V80l80 40z"/>
 </svg>
 `;
 
-  await writeFile(path.join(projectPath, 'public', 'vite.svg'), viteSvg);
+	await writeFile(path.join(projectPath, 'public', 'vite.svg'), viteSvg);
 
-  // GitHub Actions
-  if (opts.githubActions) {
-    await generateReactWorkflow(projectPath, config);
-  }
+	// GitHub Actions
+	if (opts.githubActions) {
+		await generateReactWorkflow(projectPath, config);
+	}
 }
 
 // ============================================
@@ -280,50 +284,50 @@ async function generateSourceFiles(
 // ============================================
 
 async function generateReadme(
-  projectPath: string,
-  config: ProjectConfig,
-  opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
+	projectPath: string,
+	config: ProjectConfig,
+	opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean; githubActions: boolean }
 ): Promise<void> {
-  const features = [
-    'React 19',
-    'TypeScript',
-    'Vite',
-    ...(opts.tailwind ? ['Tailwind CSS'] : []),
-    ...(opts.reactRouter ? ['React Router'] : []),
-    ...(opts.zustand ? ['Zustand'] : []),
-    ...(opts.githubActions ? ['GitHub Actions CI/CD'] : [])
-  ];
+	const features = [
+		'React 19',
+		'TypeScript',
+		'Vite',
+		...(opts.tailwind ? ['Tailwind CSS'] : []),
+		...(opts.reactRouter ? ['React Router'] : []),
+		...(opts.zustand ? ['Zustand'] : []),
+		...(opts.githubActions ? ['GitHub Actions CI/CD'] : []),
+	];
 
-  const readme = generateReadmeTemplate({
-    projectName: config.name,
-    description: 'Progetto React + TypeScript creato con Create Project CLI.',
-    features,
-    packageManager: config.packageManager,
-    commands: commonCommands.vite(config.packageManager),
-    sections: [
-      projectStructureSections.react({ reactRouter: opts.reactRouter, zustand: opts.zustand })
-    ]
-  });
+	const readme = generateReadmeTemplate({
+		projectName: config.name,
+		description: 'Progetto React + TypeScript creato con Create Project CLI.',
+		features,
+		packageManager: config.packageManager,
+		commands: commonCommands.vite(config.packageManager),
+		sections: [
+			projectStructureSections.react({ reactRouter: opts.reactRouter, zustand: opts.zustand }),
+		],
+	});
 
-  await writeFile(path.join(projectPath, 'README.md'), readme);
+	await writeFile(path.join(projectPath, 'README.md'), readme);
 }
 
 // Genera lo store Zustand
 async function generateZustandStore(projectPath: string): Promise<void> {
-  await writeFile(
-    path.join(projectPath, 'src', 'store', 'counterStore.ts'),
-    generateCounterStore()
-  );
+	await writeFile(
+		path.join(projectPath, 'src', 'store', 'counterStore.ts'),
+		generateCounterStore()
+	);
 }
 
 // Genera file con React Router
 async function generateReactRouterFiles(
-  projectPath: string,
-  projectName: string,
-  opts: { tailwind: boolean; zustand: boolean }
+	projectPath: string,
+	projectName: string,
+	opts: { tailwind: boolean; zustand: boolean }
 ): Promise<void> {
-  // src/main.tsx con Router
-  const mainTsx = `import { StrictMode } from 'react';
+	// src/main.tsx con Router
+	const mainTsx = `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
@@ -338,10 +342,10 @@ createRoot(document.getElementById('root')!).render(
 );
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'main.tsx'), mainTsx);
+	await writeFile(path.join(projectPath, 'src', 'main.tsx'), mainTsx);
 
-  // src/App.tsx con Routes
-  const appTsx = `import { Routes, Route } from 'react-router-dom';
+	// src/App.tsx con Routes
+	const appTsx = `import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import About from './pages/About';
@@ -360,13 +364,13 @@ function App() {
 export default App;
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'App.tsx'), appTsx);
+	await writeFile(path.join(projectPath, 'src', 'App.tsx'), appTsx);
 
-  // src/components/Layout.tsx
-  let layoutTsx: string;
+	// src/components/Layout.tsx
+	let layoutTsx: string;
 
-  if (opts.tailwind) {
-    layoutTsx = `import { Outlet, Link } from 'react-router-dom';
+	if (opts.tailwind) {
+		layoutTsx = `import { Outlet, Link } from 'react-router-dom';
 
 export default function Layout() {
   return (
@@ -394,8 +398,8 @@ export default function Layout() {
   );
 }
 `;
-  } else {
-    layoutTsx = `import { Outlet, Link } from 'react-router-dom';
+	} else {
+		layoutTsx = `import { Outlet, Link } from 'react-router-dom';
 
 export default function Layout() {
   return (
@@ -413,16 +417,16 @@ export default function Layout() {
   );
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'components', 'Layout.tsx'), layoutTsx);
+	await writeFile(path.join(projectPath, 'src', 'components', 'Layout.tsx'), layoutTsx);
 
-  // src/pages/Home.tsx
-  let homeTsx: string;
+	// src/pages/Home.tsx
+	let homeTsx: string;
 
-  if (opts.zustand) {
-    if (opts.tailwind) {
-      homeTsx = `import { useCounterStore } from '../store/counterStore';
+	if (opts.zustand) {
+		if (opts.tailwind) {
+			homeTsx = `import { useCounterStore } from '../store/counterStore';
 
 export default function Home() {
   const { count, increment, decrement, reset } = useCounterStore();
@@ -459,8 +463,8 @@ export default function Home() {
   );
 }
 `;
-    } else {
-      homeTsx = `import { useCounterStore } from '../store/counterStore';
+		} else {
+			homeTsx = `import { useCounterStore } from '../store/counterStore';
 
 export default function Home() {
   const { count, increment, decrement, reset } = useCounterStore();
@@ -482,10 +486,10 @@ export default function Home() {
   );
 }
 `;
-    }
-  } else {
-    if (opts.tailwind) {
-      homeTsx = `export default function Home() {
+		}
+	} else {
+		if (opts.tailwind) {
+			homeTsx = `export default function Home() {
   return (
     <div className="text-center">
       <h1 className="text-4xl font-bold mb-4">${projectName}</h1>
@@ -494,8 +498,8 @@ export default function Home() {
   );
 }
 `;
-    } else {
-      homeTsx = `export default function Home() {
+		} else {
+			homeTsx = `export default function Home() {
   return (
     <div className="home">
       <h1>${projectName}</h1>
@@ -504,16 +508,16 @@ export default function Home() {
   );
 }
 `;
-    }
-  }
+		}
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'pages', 'Home.tsx'), homeTsx);
+	await writeFile(path.join(projectPath, 'src', 'pages', 'Home.tsx'), homeTsx);
 
-  // src/pages/About.tsx
-  let aboutTsx: string;
+	// src/pages/About.tsx
+	let aboutTsx: string;
 
-  if (opts.tailwind) {
-    aboutTsx = `export default function About() {
+	if (opts.tailwind) {
+		aboutTsx = `export default function About() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-4">About</h1>
@@ -524,8 +528,8 @@ export default function Home() {
   );
 }
 `;
-  } else {
-    aboutTsx = `export default function About() {
+	} else {
+		aboutTsx = `export default function About() {
   return (
     <div className="about">
       <h1>About</h1>
@@ -534,19 +538,19 @@ export default function Home() {
   );
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'pages', 'About.tsx'), aboutTsx);
+	await writeFile(path.join(projectPath, 'src', 'pages', 'About.tsx'), aboutTsx);
 }
 
 // Genera file base senza React Router
 async function generateBasicFiles(
-  projectPath: string,
-  projectName: string,
-  opts: { tailwind: boolean; zustand: boolean }
+	projectPath: string,
+	projectName: string,
+	opts: { tailwind: boolean; zustand: boolean }
 ): Promise<void> {
-  // src/main.tsx
-  const mainTsx = `import { StrictMode } from 'react';
+	// src/main.tsx
+	const mainTsx = `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -558,14 +562,14 @@ createRoot(document.getElementById('root')!).render(
 );
 `;
 
-  await writeFile(path.join(projectPath, 'src', 'main.tsx'), mainTsx);
+	await writeFile(path.join(projectPath, 'src', 'main.tsx'), mainTsx);
 
-  // src/App.tsx
-  let appTsx: string;
+	// src/App.tsx
+	let appTsx: string;
 
-  if (opts.zustand) {
-    if (opts.tailwind) {
-      appTsx = `import { useCounterStore } from './store/counterStore';
+	if (opts.zustand) {
+		if (opts.tailwind) {
+			appTsx = `import { useCounterStore } from './store/counterStore';
 
 function App() {
   const { count, increment, decrement, reset } = useCounterStore();
@@ -606,8 +610,8 @@ function App() {
 
 export default App;
 `;
-    } else {
-      appTsx = `import { useCounterStore } from './store/counterStore';
+		} else {
+			appTsx = `import { useCounterStore } from './store/counterStore';
 
 function App() {
   const { count, increment, decrement, reset } = useCounterStore();
@@ -631,10 +635,10 @@ function App() {
 
 export default App;
 `;
-    }
-  } else {
-    if (opts.tailwind) {
-      appTsx = `function App() {
+		}
+	} else {
+		if (opts.tailwind) {
+			appTsx = `function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
@@ -647,8 +651,8 @@ export default App;
 
 export default App;
 `;
-    } else {
-      appTsx = `function App() {
+		} else {
+			appTsx = `function App() {
   return (
     <div className="app">
       <h1>${projectName}</h1>
@@ -659,21 +663,21 @@ export default App;
 
 export default App;
 `;
-    }
-  }
+		}
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'App.tsx'), appTsx);
+	await writeFile(path.join(projectPath, 'src', 'App.tsx'), appTsx);
 }
 
 // Genera gli stili CSS
 async function generateStyles(projectPath: string, useTailwind: boolean): Promise<void> {
-  let indexCss: string;
+	let indexCss: string;
 
-  if (useTailwind) {
-    indexCss = `@import "tailwindcss";
+	if (useTailwind) {
+		indexCss = `@import "tailwindcss";
 `;
-  } else {
-    indexCss = `:root {
+	} else {
+		indexCss = `:root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -797,7 +801,7 @@ p {
   background-color: #16a34a;
 }
 `;
-  }
+	}
 
-  await writeFile(path.join(projectPath, 'src', 'index.css'), indexCss);
+	await writeFile(path.join(projectPath, 'src', 'index.css'), indexCss);
 }

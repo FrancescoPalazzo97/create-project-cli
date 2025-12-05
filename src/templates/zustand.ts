@@ -27,7 +27,7 @@
  * ```
  */
 export function generateCounterStore(): string {
-  return `import { create } from 'zustand';
+	return `import { create } from 'zustand';
 
 interface CounterState {
   count: number;
@@ -72,13 +72,13 @@ export const useCounterStore = create<CounterState>((set) => ({
  * ```
  */
 export function generateCustomStore(
-  storeName: string,
-  stateInterface: string,
-  initialState: string
+	storeName: string,
+	stateInterface: string,
+	initialState: string
 ): string {
-  const hookName = `use${storeName.charAt(0).toUpperCase()}${storeName.slice(1)}Store`;
+	const hookName = `use${storeName.charAt(0).toUpperCase()}${storeName.slice(1)}Store`;
 
-  return `import { create } from 'zustand';
+	return `import { create } from 'zustand';
 
 ${stateInterface}
 
@@ -105,7 +105,7 @@ export const ${hookName} = create<${storeName.charAt(0).toUpperCase()}${storeNam
  * ```
  */
 export function generatePersistedStore(): string {
-  return `import { create } from 'zustand';
+	return `import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface ThemeState {
@@ -138,7 +138,7 @@ export const useThemeStore = create<ThemeState>()(
  * @returns Contenuto del file store con devtools middleware
  */
 export function generateStoreWithDevtools(): string {
-  return `import { create } from 'zustand';
+	return `import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
 interface AppState {
@@ -171,7 +171,7 @@ export const useAppStore = create<AppState>()(
  * @returns Contenuto del file README.md per la cartella store
  */
 export function generateStoreReadme(): string {
-  return `# Store Zustand
+	return `# Store Zustand
 
 Questa cartella contiene gli store Zustand per la gestione dello stato dell'applicazione.
 
