@@ -1,15 +1,14 @@
 import path from 'node:path';
-import { writeFile, writeJsonFile, createDirectory } from '../utils/fileSystem.js';
-import { logger } from '../utils/logger.js';
-import type { ProjectConfig } from '../types/index.js';
-import { generateReactWorkflow } from './githubActionsGenerator.js';
 import { gitignorePresets } from '../templates/gitignore.js';
-import { generateCounterStore } from '../templates/zustand.js';
 import {
-	generateReadme as generateReadmeTemplate,
 	commonCommands,
+	generateReadme as generateReadmeTemplate,
 	projectStructureSections,
 } from '../templates/readme.js';
+import { generateCounterStore } from '../templates/zustand.js';
+import type { ProjectConfig } from '../types';
+import { createDirectory, getVersionsWithStatus, logger, writeFile, writeJsonFile } from '../utils';
+import { generateReactWorkflow } from './githubActionsGenerator.js';
 
 export async function generateReactProject(config: ProjectConfig): Promise<void> {
 	const projectPath = path.resolve(config.directory);
@@ -20,23 +19,27 @@ export async function generateReactProject(config: ProjectConfig): Promise<void>
 		githubActions: false,
 	};
 
-	logger.step(1, 5, 'Creazione struttura cartelle...');
+	logger.step(1, 6, 'Creazione struttura cartelle...');
 
 	await createDirectoryStructure(projectPath, opts);
 
-	logger.step(2, 5, 'Generazione package.json...');
+	logger.step(2, 6, 'Recuperamento versioni pacchetti...');
 
-	await generatePackageJson(projectPath, config.name, opts);
+	const versions = await fetchPackageVersions(opts);
 
-	logger.step(3, 5, 'Generazione file di configurazione...');
+	logger.step(3, 6, 'Generazione package.json...');
 
-	await generateConfigFiles(projectPath, config.name, opts);
+	await generatePackageJson(projectPath, config.name, opts, versions);
 
-	logger.step(4, 5, 'Generazione file sorgente...');
+	logger.step(4, 6, 'Generazione file di configurazione...');
+
+	await generateConfigFiles(projectPath, opts);
+
+	logger.step(5, 6, 'Generazione file sorgente...');
 
 	await generateSourceFiles(projectPath, config.name, config, opts);
 
-	logger.step(5, 5, 'Generazione README...');
+	logger.step(6, 6, 'Generazione README...');
 
 	await generateReadme(projectPath, config, opts);
 }
@@ -65,44 +68,88 @@ async function createDirectoryStructure(
 }
 
 // ============================================
+// Packages versions
+// ============================================
+
+async function fetchPackageVersions(opts: {
+	tailwind: boolean;
+	reactRouter: boolean;
+	zustand: boolean;
+}): Promise<Record<string, string>> {
+	const basePackages = [
+		'react',
+		'react-dom',
+		'@eslint/js',
+		'@types/react',
+		'@types/react-dom',
+		'@vitejs/plugin-react',
+		'eslint',
+		'eslint-plugin-react-hooks',
+		'eslint-plugin-react-refresh',
+		'globals',
+		'typescript',
+		'typescript-eslint',
+		'vite',
+	];
+
+	// Pacchetti opzionali
+	if (opts.reactRouter) basePackages.push('react-router-dom');
+	if (opts.zustand) basePackages.push('zustand');
+	if (opts.tailwind) {
+		basePackages.push('tailwindcss', '@tailwindcss/vite');
+	}
+
+	// Fetch versioni in parallelo
+	const { versions, fromNetwork } = await getVersionsWithStatus(basePackages);
+
+	if (!fromNetwork) {
+		logger.offline('Rete non disponibile, uso versioni di fallback');
+	}
+
+	return versions;
+}
+
+// ============================================
 // PACKAGE.JSON
 // ============================================
 
 async function generatePackageJson(
 	projectPath: string,
 	projectName: string,
-	opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean }
+	opts: { tailwind: boolean; reactRouter: boolean; zustand: boolean },
+	versions: Record<string, string>
 ): Promise<void> {
 	const dependencies: Record<string, string> = {
-		react: '^19.1.0',
-		'react-dom': '^19.1.0',
+		react: versions['react'],
+		'react-dom': versions['react-dom'],
 	};
 
 	const devDependencies: Record<string, string> = {
-		'@eslint/js': '^9.25.0',
-		'@types/react': '^19.1.2',
-		'@types/react-dom': '^19.1.2',
-		'@vitejs/plugin-react': '^4.4.1',
-		eslint: '^9.25.0',
-		'eslint-plugin-react-hooks': '^5.2.0',
-		'eslint-plugin-react-refresh': '^0.4.19',
-		globals: '^16.0.0',
-		typescript: '~5.8.3',
-		'typescript-eslint': '^8.30.1',
-		vite: '^6.3.5',
+		'@eslint/js': versions['@eslint/js'],
+		'@types/react': versions['@types/react'],
+		'@types/react-dom': versions['@types/react-dom'],
+		'@vitejs/plugin-react': versions['@vitejs/plugin-react'],
+		eslint: versions['eslint'],
+		'eslint-plugin-react-hooks': versions['eslint-plugin-react-hooks'],
+		'eslint-plugin-react-refresh': versions['eslint-plugin-react-refresh'],
+		globals: versions['globals'],
+		typescript: versions['typescript'],
+		'typescript-eslint': versions['typescript-eslint'],
+		vite: versions['vite'],
 	};
 
+	// Aggiungi dipendenze opzionali
 	if (opts.reactRouter) {
-		dependencies['react-router-dom'] = '^7.6.0';
+		dependencies['react-router-dom'] = versions['react-router-dom'];
 	}
 
 	if (opts.zustand) {
-		dependencies['zustand'] = '^5.0.4';
+		dependencies['zustand'] = versions['zustand'];
 	}
 
 	if (opts.tailwind) {
-		devDependencies['tailwindcss'] = '^4.1.6';
-		devDependencies['@tailwindcss/vite'] = '^4.1.6';
+		devDependencies['tailwindcss'] = versions['tailwindcss'];
+		devDependencies['@tailwindcss/vite'] = versions['@tailwindcss/vite'];
 	}
 
 	const packageJson = {
@@ -129,7 +176,6 @@ async function generatePackageJson(
 
 async function generateConfigFiles(
 	projectPath: string,
-	projectName: string,
 	opts: { tailwind: boolean }
 ): Promise<void> {
 	// tsconfig.json

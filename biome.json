@@ -29,7 +29,7 @@
 			},
 			"style": {
 				"useConst": "error",
-				"noNonNullAssertion": "warn",
+				"noNonNullAssertion": "off",
 				"useTemplate": "warn",
 				"useNodejsImportProtocol": "error",
 				"useExportType": "error",

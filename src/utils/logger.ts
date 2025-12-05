@@ -1,7 +1,7 @@
-import chalk from 'chalk';
-import gradient from 'gradient-string';
 import boxen from 'boxen';
+import chalk from 'chalk';
 import figures from 'figures';
+import gradient from 'gradient-string';
 
 // Gradienti personalizzati
 const titleGradient = gradient(['#ff6b6b', '#4ecdc4', '#45b7d1']);
@@ -90,5 +90,10 @@ export const logger = {
 	// Divisore
 	divider: () => {
 		console.log(chalk.dim('─'.repeat(50)));
+	},
+
+	// Warning per fallback versioni
+	offline: (message: string) => {
+		console.log(chalk.yellow(figures.warning), chalk.yellow(message));
 	},
 };
